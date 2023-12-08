@@ -191,7 +191,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			{
 				var __ = expr4.NewChild<SequenceNode>("parensExpr");
 				__.SetChildren(lParenToken, expression, rParenToken);
-				__.Builder = a => new ParensExpr(a[1].As<Expression>());
+				__.Builder = a => new ParensExpr(a[1].As<Expression?>());
 			}
 
 			var expr3 = new MultipleNode("expr3");

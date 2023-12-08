@@ -132,7 +132,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public override string? ToString()
 		{
 			var childStrs = Children?
-				.Select(ch => $"{ch?.Oper switch
+				.Select(ch => ch?.Oper switch
 				{
 					Operator.Comp.Eq => " = ",
 					Operator.Comp.Ne => " <> ",
@@ -149,7 +149,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 					Operator.Logical.Or => " OR ",
 					Operator.Logical.Not => "NOT ",
 					_ => default,
-				}}{ch?.Expression?.ToString(ToStringOptions.WithBrackets)}")
+				} + $"{ch?.Expression?.ToString(ToStringOptions.WithBrackets)}")
 				?? Enumerable.Empty<string?>();
 			return ToString(string.Concat(childStrs));
 		}
