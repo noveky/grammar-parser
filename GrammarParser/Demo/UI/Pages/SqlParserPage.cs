@@ -16,13 +16,13 @@ namespace GrammarParser.Demo.UI.Pages
 				try
 				{
 					string sql = IO.Input<string>("Enter sql", ConsoleColor.DarkGray, ConsoleColor.White) ?? string.Empty;
-					var results = sqlParser.Parse(sql);
-					if (!results.Any())
+					var results = sqlParser.Parse(sql).ToArray();
+					if (results.Length == 0)
 					{
 						IO.LogError("Error", "Failed to parse sql");
 						continue;
 					}
-					if (results.Count() > 1)
+					if (results.Length > 1)
 					{
 						IO.LogWarning("Warning", "Ambiguous grammar rule");
 					}

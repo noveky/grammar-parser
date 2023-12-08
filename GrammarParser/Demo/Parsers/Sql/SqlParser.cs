@@ -19,215 +19,206 @@
 			var dotToken = sqlParser.NewToken("dot", @"\.");
 			var unsignedIntToken = sqlParser.NewToken("unsignedInt", @"\d+", t => int.Parse(t.Value));
 			var unsignedFloatToken = sqlParser.NewToken("unsignedFloat", @"\d+\.\d+", t => int.Parse(t.Value));
-			var minusToken = sqlParser.NewToken("minus", @"-");
 			var eqToken = sqlParser.NewToken("eq", @"=");
-
-			// Functions
-
-			// TODO ConcatList
+			var plusToken = sqlParser.NewToken("plus", @"\+");
+			var minusToken = sqlParser.NewToken("minus", @"-");
 
 			// Grammar nodes
 
+			var empty = new EmptyNode("ε");
+
 			var value = new MultipleNode("value");
 			{
-				var __0 = value.NewChild(new SequenceNode());
-				{
-					__0.SetChildren(unsignedIntToken);
-					__0.Builder = a => new ValueSqlNode(a[0].AsInt());
-				}
-				var __1 = value.NewChild(new SequenceNode());
-				{
-					__1.SetChildren(minusToken, unsignedIntToken);
-					__1.Builder = a => new ValueSqlNode(-a[1].AsInt());
-				}
-				var __2 = value.NewChild(new SequenceNode());
-				{
-					__2.SetChildren(unsignedFloatToken);
-					__2.Builder = a => new ValueSqlNode(a[0].AsFloat());
-				}
-				var __3 = value.NewChild(new SequenceNode());
-				{
-					__3.SetChildren(minusToken, unsignedFloatToken);
-					__3.Builder = a => new ValueSqlNode(-a[1].AsFloat());
-				}
+				var __ = value.NewChild(new SequenceNode());
+				__.SetChildren(unsignedIntToken);
+				__.Builder = a => new Value(a[0].AsInt());
+			}
+			{
+				var __ = value.NewChild(new SequenceNode());
+				__.SetChildren(minusToken, unsignedIntToken);
+				__.Builder = a => new Value(-a[1].AsInt());
+			}
+			{
+				var __ = value.NewChild(new SequenceNode());
+				__.SetChildren(unsignedFloatToken);
+				__.Builder = a => new Value(a[0].AsFloat());
+			}
+			{
+				var __ = value.NewChild(new SequenceNode());
+				__.SetChildren(minusToken, unsignedFloatToken);
+				__.Builder = a => new Value(-a[1].AsFloat());
 			}
 
 			var asAlias = new MultipleNode("asAlias");
 			{
-				var __0 = asAlias.NewChild(new EmptyNode());
-				var __1 = asAlias.NewChild(idToken);
-				var __2 = asAlias.NewChild(new SequenceNode());
-				{
-					__2.SetChildren(asToken, idToken);
-					__2.Builder = a => a[1].As<string>();
-				}
+				var __ = asAlias.NewChild(empty);
+			}
+			{
+				var __ = asAlias.NewChild(idToken);
+			}
+			{
+				var __ = asAlias.NewChild(new SequenceNode());
+				__.SetChildren(asToken, idToken);
+				__.Builder = a => a[1].AsString();
 			}
 
 			var fieldName = new MultipleNode("fieldName");
 			{
-				var __0 = fieldName.NewChild(starToken);
-				var __1 = fieldName.NewChild(idToken);
+				var __ = fieldName.NewChild(starToken);
+			}
+			{
+				var __ = fieldName.NewChild(idToken);
 			}
 
 			var attr = new MultipleNode("attr");
 			{
-				var __0 = attr.NewChild(new SequenceNode());
+				var __ = attr.NewChild(new SequenceNode());
+				__.SetChildren(fieldName, asAlias);
+				__.Builder = a => new Attribute()
 				{
-					__0.SetChildren(fieldName, asAlias);
-					__0.Builder = a => new AttributeSqlNode()
-					{
-						FieldName = a[0].As<string>(),
-						Alias = a[1].As<string>(),
-					};
-				}
-				var __1 = attr.NewChild(new SequenceNode());
+					FieldName = a[0].AsString(),
+					Alias = a[1].AsString(),
+				};
+			}
+			{
+				var __ = attr.NewChild(new SequenceNode());
+				__.SetChildren(idToken, dotToken, fieldName, asAlias);
+				__.Builder = a => new Attribute()
 				{
-					__1.SetChildren(idToken, dotToken, fieldName, asAlias);
-					__1.Builder = a => new AttributeSqlNode()
-					{
-						RelationName = a[0].AsString(),
-						FieldName = a[2].AsString(),
-						Alias = a[3].AsString(),
-					};
-				}
+					RelationName = a[0].AsString(),
+					FieldName = a[2].AsString(),
+					Alias = a[3].AsString(),
+				};
 			}
 
-			var attrList = new MultipleNode("attrList");
+			var arithOper = new MultipleNode("arithOper");
 			{
-				var __0 = attrList.NewChild(new EmptyNode());
-				var __1 = attrList.NewChild(new SequenceNode());
-				{
-					__1.SetChildren(commaToken, attr, attrList);
-					__1.Builder = a =>
-					{
-						IEnumerable<AttributeSqlNode?> __;
-						var _attr = a[1].As<AttributeSqlNode>();
-						var _attrList = a[2].As<IEnumerable<AttributeSqlNode?>>();
-						__ = new[] { _attr };
-						if (_attrList is not null) __ = __.Concat(_attrList);
-						return __;
-					};
-				}
+				var __ = arithOper.NewChild(new SequenceNode());
+				__.SetChildren(plusToken);
+				__.Builder = a => Operator.Arith.Add;
+			}
+			{
+				var __ = arithOper.NewChild(new SequenceNode());
+				__.SetChildren(minusToken);
+				__.Builder = a => Operator.Arith.Subtract;
 			}
 
-			var compOperator = new MultipleNode("compOperator");
+			var compOper = new MultipleNode("compOper");
 			{
-				var __0 = compOperator.NewChild(new SequenceNode());
-				{
-					__0.SetChildren(eqToken);
-					__0.Builder = a => CompOperator.Eq;
-				}
+				var __ = compOper.NewChild(new SequenceNode());
+				__.SetChildren(eqToken);
+				__.Builder = a => Operator.Comp.Eq;
 			}
 
-			var compOperand = new MultipleNode("compOperand");
+			var expr3 = new MultipleNode("expr3");
 			{
-				var __0 = compOperand.NewChild(value);
-				var __1 = compOperand.NewChild(attr);
+				var __ = expr3.NewChild(new SequenceNode("valueExpr"));
+				__.SetChildren(value);
+				__.Builder = a => new ValueExpr(a[0].As<Value?>());
+			}
+			{
+				var __ = expr3.NewChild(new SequenceNode("attrExpr"));
+				__.SetChildren(attr);
+				__.Builder = a => new AttrExpr(a[0].As<Attribute?>());
+			}
+
+			var expr2 = new MultipleNode("expr2");
+			{
+				var __ = expr2.NewChild(expr3);
+			}
+			{
+				var __ = expr2.NewChild(new SequenceNode("arithExpr"));
+				__.SetChildren(expr3, arithOper, expr2);
+				__.Builder = a =>
+				{
+					var _expr3 = a[0].As<Expression?>();
+					var _arithOper = a[1].As<Operator.Arith?>();
+					var _expr2 = a[2].As<Expression?>();
+					return ArithExpr.Join(_arithOper, _expr3, _expr2);
+				};
+			}
+
+			var expr1 = new MultipleNode("expr1");
+			{
+				var __ = expr1.NewChild(expr2);
+			}
+			{
+				var __ = expr1.NewChild(new SequenceNode("compExpr"));
+				__.SetChildren(expr2, compOper, expr1);
+				__.Builder = a => new CompExpr
+				(
+					oper: a[1].As<Operator.Comp?>(),
+					left: a[0].As<Expression?>(),
+					right: a[2].As<Expression?>()
+				);
 			}
 
 			var expression = new MultipleNode("expression");
 			{
-				var __0 = expression.NewChild(new SequenceNode());
-				{
-					__0.SetChildren(value);
-					__0.Builder = a => new ValueExprSqlNode
-					{
-						Value = a[0].As<ValueSqlNode>(),
-					};
-				}
-				var __1 = expression.NewChild(new SequenceNode());
-				{
-					__1.SetChildren(attr);
-					__1.Builder = a => new AttrExprSqlNode
-					{
-						Attribute = a[0].As<AttributeSqlNode>(),
-					};
-				}
-				var __2 = expression.NewChild(new SequenceNode());
-				{
-					__2.SetChildren(expression, compOperator, expression);
-					__2.Builder = a => new CompExprSqlNode
-					{
-						Operator = a[1].AsValueType<CompOperator>(),
-						Left = a[0].As<ExpressionSqlNode>(),
-						Right = a[2].As<ExpressionSqlNode>(),
-					};
-				}
+				var __ = expression.NewChild(expr1);
+			}
+
+			var restExpressions = new MultipleNode("restExpressions");
+			{
+				var __ = restExpressions.NewChild(empty);
+			}
+			{
+				var __ = restExpressions.NewChild(new SequenceNode());
+				__.SetChildren(commaToken, expression, restExpressions);
+				__.Builder = a => a[1].JoinBefore<Expression?>(a[2]);
 			}
 
 			var where = new MultipleNode("where");
 			{
-				var __0 = where.NewChild(new EmptyNode());
-				var __1 = where.NewChild(new SequenceNode());
-				{
-					__1.SetChildren(whereToken, expression);
-					__1.Builder = a => a[1].As<ExpressionSqlNode>();
-				}
+				var __ = where.NewChild(empty);
+			}
+			{
+				var __ = where.NewChild(new SequenceNode());
+				__.SetChildren(whereToken, expression);
+				__.Builder = a => a[1].As<Expression?>();
 			}
 
 			var relation = new SequenceNode("relation");
+			relation.SetChildren(idToken, asAlias);
+			relation.Builder = a =>
 			{
-				relation.SetChildren(idToken, asAlias);
-				relation.Builder = a =>
+				return new Relation()
 				{
-					return new RelationSqlNode()
-					{
-						Name = a[0].AsString(),
-						Alias = a[1].AsString(),
-					};
+					Name = a[0].AsString(),
+					Alias = a[1].AsString(),
 				};
-			}
+			};
 
-			var relList = new MultipleNode("relList");
+			var restRelations = new MultipleNode("restRelations");
 			{
-				var __0 = relList.NewChild(new EmptyNode());
-				var __1 = relList.NewChild(new SequenceNode());
-				{
-					__1.SetChildren(commaToken, relation, relList);
-					__1.Builder = a =>
-					{
-						IEnumerable<RelationSqlNode?> __;
-						var _relation = a[1].As<RelationSqlNode>();
-						var _relList = a[2].As<IEnumerable<RelationSqlNode?>>();
-						__ = new[] { _relation };
-						if (_relList is not null) __ = __.Concat(_relList);
-						return __;
-					};
-				}
+				var __ = restRelations.NewChild(empty);
+			}
+			{
+				var __ = restRelations.NewChild(new SequenceNode());
+				__.SetChildren(commaToken, relation, restRelations);
+				__.Builder = a => a[1].JoinBefore<Relation?>(restRelations);
 			}
 
 			var from = new MultipleNode("from");
 			{
-				var __0 = from.NewChild(new EmptyNode());
-				var __1 = from.NewChild(new SequenceNode());
-				{
-					__1.SetChildren(fromToken, relation, relList);
-					__1.Builder = a =>
-					{
-						IEnumerable<RelationSqlNode?> __;
-						var _relation = a[1].As<RelationSqlNode>();
-						var _relList = a[2].As<IEnumerable<RelationSqlNode?>>();
-						__ = new[] { _relation };
-						if (_relList is not null) __ = __.Concat(_relList);
-						return __;
-					};
-				};
+				var __ = from.NewChild(empty);
+			}
+			{
+				var __ = from.NewChild(new SequenceNode());
+				__.SetChildren(fromToken, relation, restRelations);
+				__.Builder = a => a[1].JoinBefore<Relation?>(a[2]);
 			}
 
 			var selectStmt = new SequenceNode("selectStmt");
-			selectStmt.SetChildren(selectToken, attr, attrList, from, where);
+			selectStmt.SetChildren(selectToken, expression, restExpressions, from, where);
 			selectStmt.Builder = a =>
 			{
-				IEnumerable<AttributeSqlNode?> _selectList;
-				var _attr = a[1].As<AttributeSqlNode>();
-				var _attrList = a[2].As<IEnumerable<AttributeSqlNode?>>();
-				var _from = a[3].As<IEnumerable<RelationSqlNode>>();
-				var _where = a[4].As<ExpressionSqlNode>();
-				_selectList = new[] { _attr };
-				if (_attrList is not null) _selectList = _selectList.Concat(_attrList);
+				var _from = a[3].AsEnumerable<Relation?>();
+				var _where = a[4].As<Expression?>();
+				var selectList = a[1].JoinBefore<Expression?>(a[2]);
 				return new
 				{
-					selectList = $"[{string.Join(", ", _selectList)}]",
+					selectList = $"[{string.Join(", ", selectList)}]",
 					fromList = _from is null ? null : $"[{string.Join(", ", _from)}]",
 					whereCondition = _where,
 				};
