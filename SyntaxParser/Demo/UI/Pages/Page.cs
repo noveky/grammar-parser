@@ -1,7 +1,7 @@
-﻿using GrammarParser.Demo.Shared;
+﻿using SyntaxParser.Demo.Shared;
 using System.Runtime.CompilerServices;
 
-namespace GrammarParser.Demo.UI.Pages
+namespace SyntaxParser.Demo.UI.Pages
 {
 	public interface IPage
 	{

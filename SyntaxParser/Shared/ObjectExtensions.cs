@@ -1,4 +1,4 @@
-﻿namespace GrammarParser.Shared
+﻿namespace SyntaxParser.Shared
 {
 	public static class ObjectExtentions
 	{

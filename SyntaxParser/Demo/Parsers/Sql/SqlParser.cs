@@ -1,12 +1,12 @@
-﻿using GrammarParser.Shared;
+﻿using SyntaxParser.Shared;
 using System.Diagnostics;
 using System.Dynamic;
 
-namespace GrammarParser.Demo.Parsers.Sql
+namespace SyntaxParser.Demo.Parsers.Sql
 {
 	public class SqlParser
 	{
-		readonly GeneralParser sqlParser = new();
+		readonly Parser sqlParser = new();
 
 		public SqlParser()
 		{
@@ -35,7 +35,7 @@ namespace GrammarParser.Demo.Parsers.Sql
 			var plusToken = sqlParser.NewToken("plus", @"\+");
 			var minusToken = sqlParser.NewToken("minus", @"-");
 
-			// Grammar nodes
+			// Syntax nodes
 
 			var empty = new EmptyNode("ε");
 
@@ -364,7 +364,7 @@ namespace GrammarParser.Demo.Parsers.Sql
 				__.SetChildren(selectStmt);
 			}
 
-			sqlParser.RootGrammarRule = stmt;
+			sqlParser.RootSyntaxNode = stmt;
 			sqlParser.IgnoreCase = true;
 		}
 

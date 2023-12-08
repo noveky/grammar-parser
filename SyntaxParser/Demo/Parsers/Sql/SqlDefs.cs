@@ -1,6 +1,6 @@
-﻿using GrammarParser.Shared;
+﻿using SyntaxParser.Shared;
 
-namespace GrammarParser.Demo.Parsers.Sql
+namespace SyntaxParser.Demo.Parsers.Sql
 {
 	public class SelectSqlNode
 	{

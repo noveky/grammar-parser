@@ -1,4 +1,4 @@
-﻿namespace GrammarParser.Demo.Shared
+﻿namespace SyntaxParser.Demo.Shared
 {
 	internal static class Context
 	{

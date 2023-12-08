@@ -1,14 +1,14 @@
 ﻿using System.Diagnostics;
 using System.Text.RegularExpressions;
 
-namespace GrammarParser
+namespace SyntaxParser
 {
-	public class GeneralParser
+	public class Parser
 	{
 		public static bool LogDebug { get; set; } = false;
 
 		readonly List<TokenType> tokenTypes = new();
-		public IGrammarNode? RootGrammarRule { get; set; }
+		public ISyntaxNode? RootSyntaxNode { get; set; }
 		public bool IgnoreCase { get; set; } = false;
 
 		public TokenNode NewToken(string? name, string regex, Func<Token, object?>? builder = null, bool ignore = false)
@@ -40,14 +40,14 @@ namespace GrammarParser
 
 		public IEnumerable<object?> Parse(string str)
 		{
-			if (RootGrammarRule is null) throw new InvalidOperationException();
+			if (RootSyntaxNode is null) throw new InvalidOperationException();
 			if (!Tokenize(str, out var tokens) || tokens is null)
 			{
 				Debug.WriteLineIf(LogDebug, "Failed to tokenize the input string", "Parser");
 				yield break;
 			}
 			Debug.WriteLineIf(LogDebug, "Start to parse the tokens", "Parser");
-			foreach (var result in RootGrammarRule.Parse(tokens))
+			foreach (var result in RootSyntaxNode.Parse(tokens))
 			{
 				if (!tokens.AtEnd)
 				{
@@ -113,7 +113,7 @@ namespace GrammarParser
 				str = str[match.Length..];
 				if (!Ignore)
 				{
-					Debug.WriteLineIf(GeneralParser.LogDebug, $"Got token `{token}`", "Tokenization");
+					Debug.WriteLineIf(Parser.LogDebug, $"Got token `{token}`", "Tokenization");
 					tokens.Add(token);
 				}
 			}
@@ -133,12 +133,12 @@ namespace GrammarParser
 		}
 	}
 
-	public interface IGrammarNode : INameable
+	public interface ISyntaxNode : INameable
 	{
 		public IEnumerable<object?> Parse(TokenStream tokens);
 	}
 
-	public class EmptyNode : IGrammarNode
+	public class EmptyNode : ISyntaxNode
 	{
 		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}";
@@ -151,12 +151,12 @@ namespace GrammarParser
 		public EmptyNode() : this(null) { }
 		public IEnumerable<object?> Parse(TokenStream tokens)
 		{
-			Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{null}`");
+			Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{null}`");
 			yield return null;
 		}
 	}
 
-	public class TokenNode : IGrammarNode
+	public class TokenNode : ISyntaxNode
 	{
 		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}";
@@ -175,41 +175,41 @@ namespace GrammarParser
 			var token = tokens.Next();
 			if (token is null || token.Type != TokenType)
 			{
-				Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields nothing");
+				Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields nothing");
 				yield break;
 			}
 			var result = Builder?.Invoke(token);
-			Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{result}`");
+			Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{result}`");
 			yield return result;
 		}
 	}
 
-	public class SequenceNode : IGrammarNode
+	public class SequenceNode : ISyntaxNode
 	{
 		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}({string.Join(", ", Children.Select(ch => ch.Name))})";
-		public List<IGrammarNode> Children { get; set; } = new();
+		public List<ISyntaxNode> Children { get; set; } = new();
 		public Func<object?[], object?>? Builder { get; set; }
 		public SequenceNode(string? name = null) => Name = new(GetType(), name);
 		public SequenceNode() : this(null) { }
-		public TChild NewChild<TChild>(TChild child) where TChild : IGrammarNode
+		public TChild NewChild<TChild>(TChild child) where TChild : ISyntaxNode
 		{
 			Children.Add(child);
 			return child;
 		}
-		public void SetChildren(params IGrammarNode[] children) => Children = children.ToList();
+		public void SetChildren(params ISyntaxNode[] children) => Children = children.ToList();
 		IEnumerable<IEnumerable<object?>> ParseRecursive(TokenStream tokens, int childIndex)
 		{
 			if (childIndex >= Children.Count) yield break;
 			var ch = Children[childIndex];
-			Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` calls `{ch}.Parse` at child {childIndex} `{Children[childIndex]}`");
+			Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` calls `{ch}.Parse` at child {childIndex} `{Children[childIndex]}`");
 			foreach (var chResult in ch.Parse(tokens))
 			{
 				int checkpoint = tokens.Index;
 				var chResultAsArray = new[] { chResult };
 				if (childIndex == Children.Count - 1)
 				{
-					Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
+					Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
 					yield return chResultAsArray;
 				}
 				else
@@ -217,7 +217,7 @@ namespace GrammarParser
 					tokens.Index = checkpoint;
 					foreach (var restResults in ParseRecursive(tokens, childIndex + 1))
 					{
-						Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
+						Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
 						yield return chResultAsArray.Concat(restResults);
 					}
 				}
@@ -227,33 +227,33 @@ namespace GrammarParser
 		{
 			foreach (var childrenResults in ParseRecursive(tokens, 0))
 			{
-				Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{childrenResults}`");
+				Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{childrenResults}`");
 				yield return Builder?.Invoke(childrenResults.ToArray());
 			}
 		}
 	}
 
-	public class MultipleNode : IGrammarNode
+	public class MultipleNode : ISyntaxNode
 	{
 		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}[{string.Join(" | ", Children.Select(ch => ch.Name))}]";
-		public List<IGrammarNode> Children { get; set; } = new();
+		public List<ISyntaxNode> Children { get; set; } = new();
 		public MultipleNode(string? name = null) => Name = new(GetType(), name);
 		public MultipleNode() : this(null) { }
-		string? RenameChild(IGrammarNode child, int index) =>
+		string? RenameChild(ISyntaxNode child, int index) =>
 			child.Name.Value ??= $"{Name}_{child.Name.Value ?? index.ToString()}";
-		public TChild NewChild<TChild>(TChild child) where TChild : IGrammarNode
+		public TChild NewChild<TChild>(TChild child) where TChild : ISyntaxNode
 		{
 			RenameChild(child, Children.Count);
 			Children.Add(child);
 			return child;
 		}
-		public TChild NewChild<TChild>(string? name = null) where TChild : IGrammarNode, new()
+		public TChild NewChild<TChild>(string? name = null) where TChild : ISyntaxNode, new()
 		{
 			TChild child = new() { Name = new(typeof(TChild), name) };
 			return NewChild(child);
 		}
-		public void SetChildren(params IGrammarNode[] children)
+		public void SetChildren(params ISyntaxNode[] children)
 		{
 			Children = children.ToList();
 			_ = Children.Select(RenameChild);
@@ -264,10 +264,10 @@ namespace GrammarParser
 			foreach (var ch in Children)
 			{
 				tokens.Index = checkpoint;
-				Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` calls `{ch}.Parse`");
+				Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` calls `{ch}.Parse`");
 				foreach (var result in ch.Parse(tokens))
 				{
-					Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{result}`");
+					Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{result}`");
 					yield return result;
 				}
 			}

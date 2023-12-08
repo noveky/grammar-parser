@@ -1,7 +1,7 @@
-﻿using GrammarParser.Demo.Parsers.Sql;
-using GrammarParser.Demo.Shared;
+﻿using SyntaxParser.Demo.Parsers.Sql;
+using SyntaxParser.Demo.Shared;
 
-namespace GrammarParser.Demo.UI.Pages
+namespace SyntaxParser.Demo.UI.Pages
 {
     public class SqlParserPage : IPage
 	{
@@ -26,7 +26,7 @@ namespace GrammarParser.Demo.UI.Pages
 					}
 					if (results.Length > 1)
 					{
-						IO.LogWarning("Warning", "Ambiguous grammar rule");
+						IO.LogWarning("Warning", "Ambiguous syntax rule");
 					}
 					IO.PrintLn("Parsed results:", ConsoleColor.DarkGray);
 					IO.PrintLn(string.Join(",\n", results));
