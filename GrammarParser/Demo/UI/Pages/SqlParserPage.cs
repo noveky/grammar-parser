@@ -11,6 +11,8 @@ namespace GrammarParser.Demo.UI.Pages
 
 		public void Show(object? arg = null)
 		{
+			IO.PrintLn(this.FullTitle());
+			IO.PrintLn();
 			while (true)
 			{
 				try
@@ -27,10 +29,7 @@ namespace GrammarParser.Demo.UI.Pages
 						IO.LogWarning("Warning", "Ambiguous grammar rule");
 					}
 					IO.PrintLn("Parsed results:", ConsoleColor.DarkGray);
-					foreach (var result in results)
-					{
-						IO.PrintLn(result?.ToString());
-					}
+					IO.PrintLn(string.Join(",\n", results));
 				}
 				finally
 				{

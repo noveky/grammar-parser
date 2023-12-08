@@ -23,10 +23,9 @@ namespace GrammarParser.Demo.Parsers.Sql
 	{
 		public string? RelationName { get; set; }
 		public string? FieldName { get; set; }
-		public string? Alias { get; set; }
 
 		public override string? ToString() =>
-			$"{(RelationName is null ? null : $"{RelationName}.")}{FieldName}{(Alias is null ? null : $" (alias: {Alias})")}";
+			$"{(RelationName is null ? null : $"{RelationName}.")}{FieldName}";
 	}
 
 	public class Value

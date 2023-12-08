@@ -77,21 +77,19 @@ namespace GrammarParser.Demo.Parsers.Sql
 			var attr = new MultipleNode("attr");
 			{
 				var __ = attr.NewChild<SequenceNode>();
-				__.SetChildren(fieldName, asAlias);
+				__.SetChildren(fieldName);
 				__.Builder = a => new Attribute()
 				{
 					FieldName = a[0].AsString(),
-					Alias = a[1].AsString(),
 				};
 			}
 			{
 				var __ = attr.NewChild<SequenceNode>();
-				__.SetChildren(idToken, dotToken, fieldName, asAlias);
+				__.SetChildren(idToken, dotToken, fieldName);
 				__.Builder = a => new Attribute()
 				{
 					RelationName = a[0].AsString(),
 					FieldName = a[2].AsString(),
-					Alias = a[3].AsString(),
 				};
 			}
 

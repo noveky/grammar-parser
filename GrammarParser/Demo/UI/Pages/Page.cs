@@ -1,4 +1,5 @@
 ﻿using GrammarParser.Demo.Shared;
+using System.Runtime.CompilerServices;
 
 namespace GrammarParser.Demo.UI.Pages
 {
@@ -10,12 +11,13 @@ namespace GrammarParser.Demo.UI.Pages
 
 	public static class Page
 	{
+		public static string FullTitle(this IPage page) => $"{Context.AppName} - {page.Title}";
 		public static void Show<TPage>(object? arg = null) where TPage : IPage, new()
 		{
 			IPage page = new TPage();
 			while (!Context.GoingBack)
 			{
-				Console.Title = $"{Context.AppName} - {page.Title}";
+				Console.Title = page.FullTitle();
 				IO.Cls();
 				page.Show(arg);
 			}
