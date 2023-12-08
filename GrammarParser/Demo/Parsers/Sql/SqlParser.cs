@@ -205,7 +205,7 @@ namespace GrammarParser.Demo.Parsers.Sql
 				{
 					var _unaryArithOper = a[0].As<Operator.Arith?>();
 					var _expr4 = a[1].As<Expression?>();
-					return ArithExpr.Unary(_unaryArithOper, _expr4);
+					return OperatorExpr<Operator.Arith>.Unary(_unaryArithOper, _expr4);
 				};
 			}
 
@@ -221,9 +221,9 @@ namespace GrammarParser.Demo.Parsers.Sql
 					var _expr3 = a[0].As<Expression?>();
 					var _binaryArithOper = a[1].As<Operator.Arith?>();
 					var _expr2 = a[2].As<Expression?>();
-					return _expr2 is ArithExpr other && !other.IsUnary
-						? ArithExpr.JoinRest(_expr3, _binaryArithOper, other)
-						: ArithExpr.Binary(_expr3, _binaryArithOper, _expr2);
+					return _expr2 is OperatorExpr<Operator.Arith> other && !other.IsUnary
+						? OperatorExpr<Operator.Arith>.JoinRest(_expr3, _binaryArithOper, other)
+						: OperatorExpr<Operator.Arith>.Binary(_expr3, _binaryArithOper, _expr2);
 				};
 			}
 
@@ -234,7 +234,7 @@ namespace GrammarParser.Demo.Parsers.Sql
 			{
 				var __ = expr1.NewChild<SequenceNode>("compExpr");
 				__.SetChildren(expr2, compOper, expr1);
-				__.Builder = a => new CompExpr
+				__.Builder = a => OperatorExpr<Operator.Comp>.Binary
 				(
 					left: a[0].As<Expression?>(),
 					oper: a[1].As<Operator.Comp?>(),
@@ -253,7 +253,7 @@ namespace GrammarParser.Demo.Parsers.Sql
 				{
 					var _unaryLogicalOper = a[0].As<Operator.Logical?>();
 					var _expr1 = a[1].As<Expression?>();
-					return LogicalExpr.Unary(_unaryLogicalOper, _expr1);
+					return OperatorExpr<Operator.Logical>.Unary(_unaryLogicalOper, _expr1);
 				};
 			}
 
@@ -269,9 +269,9 @@ namespace GrammarParser.Demo.Parsers.Sql
 					var _expr0 = a[0].As<Expression?>();
 					var _binaryLogicalOper = a[1].As<Operator.Logical?>();
 					var _expression = a[2].As<Expression?>();
-					return _expression is LogicalExpr other && !other.IsUnary
-						? LogicalExpr.JoinRest(_expr0, _binaryLogicalOper, other)
-						: LogicalExpr.Binary(_expr0, _binaryLogicalOper, _expression);
+					return _expression is OperatorExpr<Operator.Logical> other && !other.IsUnary
+						? OperatorExpr<Operator.Logical>.JoinRest(_expr0, _binaryLogicalOper, other)
+						: OperatorExpr<Operator.Logical>.Binary(_expr0, _binaryLogicalOper, _expression);
 				};
 			}
 
