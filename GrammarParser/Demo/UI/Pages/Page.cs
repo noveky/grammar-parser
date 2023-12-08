@@ -22,7 +22,6 @@ namespace GrammarParser.Demo.UI.Pages
 			Context.HandleBack();
 		}
 
-		public static void Show<TPage>() where TPage : IPage, new()
-			=> Show<TPage>(null);
+		public static void Show<TPage>() where TPage : IPage, new() => Show<TPage>(null);
 	}
 }

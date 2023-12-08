@@ -1,36 +1,8 @@
 ﻿using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 namespace GrammarParser
 {
-	public static class ObjectExtentions
-	{
-		public static T? As<T>(this object? obj) => (T?)obj;
-		public static IEnumerable<T?>? AsEnumerable<T>(this object? obj) => obj.As<IEnumerable<T?>?>();
-		public static string? AsString(this object? obj) => obj.As<string?>();
-		public static char? AsChar(this object? obj) => obj.As<char?>();
-		public static int? AsInt(this object? obj) => obj.As<int?>();
-		public static long? AsLong(this object? obj) => obj.As<long?>();
-		public static float? AsFloat(this object? obj) => obj.As<float?>();
-		public static double? AsDouble(this object? obj) => obj.As<double?>();
-		public static bool? AsBool(this object? obj) => obj.As<bool?>();
-		public static IEnumerable<T?> Wrap<T>(this T? obj) => new[] { obj };
-		public static IEnumerable<T?> Wrap<T>(this object? obj) => new[] { obj.As<T?>() };
-		public static IEnumerable<T?> JoinEnumerable<T>(this IEnumerable<T?>? obj, IEnumerable<T?>? other) =>
-			(obj ?? Enumerable.Empty<T?>()).Concat(other ?? Enumerable.Empty<T?>());
-		public static IEnumerable<T?> JoinEnumerable<T>(this object? obj, object? other) =>
-			JoinEnumerable(obj.AsEnumerable<T?>(), other.AsEnumerable<T?>());
-		public static IEnumerable<T?> JoinAfter<T>(this T? obj, IEnumerable<T?>? other) =>
-			(other ?? Enumerable.Empty<T?>()).Append(obj);
-		public static IEnumerable<T?> JoinAfter<T>(this object? obj, object? other) =>
-			JoinAfter(obj.As<T?>(), other.AsEnumerable<T?>());
-		public static IEnumerable<T?> JoinBefore<T>(this T? obj, IEnumerable<T?>? other) =>
-			(other ?? Enumerable.Empty<T?>()).Prepend(obj);
-		public static IEnumerable<T?> JoinBefore<T>(this object? obj, object? other) =>
-			JoinBefore(obj.As<T?>(), other.AsEnumerable<T?>());
-	}
-
 	public class GrammarParser
 	{
 		public static bool LogDebug { get; set; } = false;
@@ -71,18 +43,18 @@ namespace GrammarParser
 			if (RootGrammarRule is null) throw new InvalidOperationException();
 			if (!Tokenize(str, out var tokens) || tokens is null)
 			{
-				Debug.WriteLineIf(LogDebug, "Failed to tokenize the input string");
+				Debug.WriteLineIf(LogDebug, "Failed to tokenize the input string", "Parser");
 				yield break;
 			}
-			Debug.WriteLineIf(LogDebug, "Start to parse the tokens");
+			Debug.WriteLineIf(LogDebug, "Start to parse the tokens", "Parser");
 			foreach (var result in RootGrammarRule.Parse(tokens))
 			{
 				if (!tokens.AtEnd)
 				{
-					Debug.WriteLineIf(LogDebug, $"Parser discards result `{result}` for unparsed tokens: {string.Join(", ", tokens[(tokens.Index + 1)..])}");
+					Debug.WriteLineIf(LogDebug, $"Result discarded: `{result}` for unparsed tokens: {string.Join(", ", tokens[(tokens.Index + 1)..])}", "Parser");
 					continue;
 				}
-				Debug.WriteLineIf(LogDebug, $"Parser accepts result `{result}`");
+				Debug.WriteLineIf(LogDebug, $"Result accepted: `{result}`", "Parser");
 				yield return result;
 			}
 		}
@@ -117,12 +89,12 @@ namespace GrammarParser
 
 	public interface INameable
 	{
-		public InstanceName Name { get; }
+		public InstanceName Name { get; set; }
 	}
 
 	public class TokenType : INameable
 	{
-		public InstanceName Name { get; }
+		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}(\"{RegexPattern}\")";
 		public string RegexPattern { get; }
 		public bool Ignore { get; }
@@ -141,7 +113,7 @@ namespace GrammarParser
 				str = str[match.Length..];
 				if (!Ignore)
 				{
-					Debug.WriteLineIf(GrammarParser.LogDebug, $"Got token: {token}");
+					Debug.WriteLineIf(GrammarParser.LogDebug, $"Got token `{token}`", "Tokenization");
 					tokens.Add(token);
 				}
 			}
@@ -168,7 +140,7 @@ namespace GrammarParser
 
 	public class EmptyNode : IGrammarNode
 	{
-		public InstanceName Name { get; }
+		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}";
 		public Func<object?>? Builder { get; set; }
 		public EmptyNode(string? name = null, Func<object?>? builder = null)
@@ -176,6 +148,7 @@ namespace GrammarParser
 			Name = new(GetType(), name);
 			Builder = builder;
 		}
+		public EmptyNode() : this(null) { }
 		public IEnumerable<object?> Parse(TokenStream tokens)
 		{
 			Debug.WriteLineIf(GrammarParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{null}`");
@@ -185,7 +158,7 @@ namespace GrammarParser
 
 	public class TokenNode : IGrammarNode
 	{
-		public InstanceName Name { get; }
+		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}";
 		public TokenType? TokenType { get; set; }
 		public Func<Token, object?>? Builder { get; set; }
@@ -196,6 +169,7 @@ namespace GrammarParser
 			Builder = builder;
 		}
 		public TokenNode(string? name, TokenNode tokenNode) : this(name, tokenNode.TokenType, tokenNode.Builder) { }
+		public TokenNode() : this(null) { }
 		public IEnumerable<object?> Parse(TokenStream tokens)
 		{
 			var token = tokens.Next();
@@ -212,11 +186,12 @@ namespace GrammarParser
 
 	public class SequenceNode : IGrammarNode
 	{
-		public InstanceName Name { get; }
+		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}({string.Join(", ", Children.Select(ch => ch.Name))})";
 		public List<IGrammarNode> Children { get; set; } = new();
 		public Func<object?[], object?>? Builder { get; set; }
 		public SequenceNode(string? name = null) => Name = new(GetType(), name);
+		public SequenceNode() : this(null) { }
 		public TChild NewChild<TChild>(TChild child) where TChild : IGrammarNode
 		{
 			Children.Add(child);
@@ -260,17 +235,23 @@ namespace GrammarParser
 
 	public class MultipleNode : IGrammarNode
 	{
-		public InstanceName Name { get; }
+		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}[{string.Join(" | ", Children.Select(ch => ch.Name))}]";
 		public List<IGrammarNode> Children { get; set; } = new();
 		public MultipleNode(string? name = null) => Name = new(GetType(), name);
+		public MultipleNode() : this(null) { }
 		string? RenameChild(IGrammarNode child, int index) =>
-			child is SequenceNode ? child.Name.Value ??= $"{Name}_{index}" : child.Name.ToString();
+			child.Name.Value ??= $"{Name}_{child.Name.Value ?? index.ToString()}";
 		public TChild NewChild<TChild>(TChild child) where TChild : IGrammarNode
 		{
 			RenameChild(child, Children.Count);
 			Children.Add(child);
 			return child;
+		}
+		public TChild NewChild<TChild>(string? name = null) where TChild : IGrammarNode, new()
+		{
+			TChild child = new() { Name = new(typeof(TChild), name) };
+			return NewChild(child);
 		}
 		public void SetChildren(params IGrammarNode[] children)
 		{

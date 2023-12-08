@@ -1,17 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using GrammarParser.Shared;
 
 namespace GrammarParser.Demo.Parsers.Sql
 {
+	public class SelectSqlNode
+	{
+		public IEnumerable<Expression?>? Expressions { get; set; }
+		public IEnumerable<Relation?>? Relations { get; set; }
+		public Expression? Condition { get; set; }
+
+		public override string? ToString() => $"{GetType().Name} {{\n\texpressions: [\n\t\t{string.Join(",\n\t\t", Expressions ?? Enumerable.Empty<Expression?>())}\n\t],\n\trelations: [\n\t\t{string.Join(",\n\t\t", Relations ?? Enumerable.Empty<Relation?>())}\n\t],\n\tcondition: {Condition?.ToString() ?? "null"}\n}}";
+	}
+
 	public class Relation
 	{
 		public string? Name { get; set; }
 		public string? Alias { get; set; }
 
-		public override string? ToString() => $"{Name}{(Alias is null ? null : $" (as {Alias})")}";
+		public override string? ToString() => $"{Name}{(Alias is null ? null : $" (alias: {Alias})")}";
 	}
 
 	public class Attribute
@@ -21,43 +26,32 @@ namespace GrammarParser.Demo.Parsers.Sql
 		public string? Alias { get; set; }
 
 		public override string? ToString() =>
-			$"{(RelationName is null ? null : $"{RelationName}.")}{FieldName}{(Alias is null ? null : $" (as {Alias})")}";
+			$"{(RelationName is null ? null : $"{RelationName}.")}{FieldName}{(Alias is null ? null : $" (alias: {Alias})")}";
 	}
 
 	public class Value
 	{
-		public Type? Type { get; set; }
 		public object? ValueObj { get; set; }
+		public Value(object? value) => ValueObj = value;
 
-		public Value(object? value)
-		{
-			Type = value?.GetType();
-			ValueObj = value;
-		}
+		public Type? Type => ValueObj?.GetType();
+		public bool IsNumeric => Type.IsIn(null, typeof(byte), typeof(sbyte), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long), typeof(ulong), typeof(float), typeof(double), typeof(decimal));
+		public double? GetNumeric() => IsNumeric ? Convert.ToDouble(ValueObj) : null;
+
 		public override string? ToString() => $"{ValueObj}";
 	}
 
 	public static class Operator
 	{
 		public enum Assoc { None, Left, Right }
-		public enum Arith { Add, Subtract, Negative }
-		public enum Comp { Eq }
-
-		public static bool IsUnary(Arith? @operator) =>
-			@operator is Arith.Negative;
-		public static Assoc GetAssoc(Arith? oper1, Arith? oper2) =>
-			(oper1, oper2) switch
-			{
-				(Arith.Add, Arith.Add) => Assoc.Left,
-				(Arith.Add, Arith.Subtract) => Assoc.Left,
-				(Arith.Subtract, Arith.Add) => Assoc.Left,
-				_ => Assoc.None,
-			};
+		public enum Comp { Eq, Ne, Lt, Le, Gt, Ge }
+		public enum Arith { Add, Subtract, Multiply, Divide, Negative }
+		public enum Logical { And, Or, Not }
 	}
 
 	public abstract class Expression
 	{
-		public string? Name { get; set; }
+		public string? Alias { get; set; }
 
 		public enum ToStringOptions
 		{
@@ -69,11 +63,16 @@ namespace GrammarParser.Demo.Parsers.Sql
 			string? result = ToString();
 			if ((options & ToStringOptions.WithBrackets) != 0)
 			{
-				if (this is not (ValueExpr or AttrExpr)) result = $"({result})";
+				if (this is not (ValueExpr or AttrExpr)
+					|| (this is ValueExpr valueExpr && valueExpr.Value?.GetNumeric() is < 0))
+				{
+					result = $"({result})";
+				}
 			}
 			return result;
 		}
-		public override string? ToString() => $"{Name}";
+		public string? ToString(string? str) => $"{str}{(Alias is null ? null : $" (alias: {Alias})")}";
+		public override string? ToString() => $"{Alias}";
 	}
 
 	public class ValueExpr : Expression
@@ -81,7 +80,7 @@ namespace GrammarParser.Demo.Parsers.Sql
 		public Value? Value { get; set; }
 		public ValueExpr(Value? value) => Value = value;
 
-		public override string? ToString() => $"{Value}";
+		public override string? ToString() => ToString($"{Value}");
 	}
 
 	public class AttrExpr : Expression
@@ -89,54 +88,15 @@ namespace GrammarParser.Demo.Parsers.Sql
 		public Attribute? Attribute { get; set; }
 		public AttrExpr(Attribute? attribute) => Attribute = attribute;
 
-		public override string? ToString() => $"{Attribute}";
+		public override string? ToString() => ToString($"{Attribute}");
 	}
 
-	public class ArithExpr : Expression
+	public class ParensExpr : Expression
 	{
-		public Operator.Arith? Oper { get; set; }
-		public IEnumerable<Expression?>? Children { get; set; }
-		public ArithExpr(Operator.Arith? oper, IEnumerable<Expression?>? children = null)
-		{
-			Oper = oper;
-			Children = children;
-		}
-		public static ArithExpr Join(Operator.Arith? oper, Expression? left, Expression? right)
-		{
-			IEnumerable<Expression?>? children;
-			if (left is ArithExpr l && right is ArithExpr r && Operator.GetAssoc(l.Oper, r.Oper) is Operator.Assoc lrAssoc && Operator.GetAssoc(l.Oper, oper) is Operator.Assoc lAssoc && Operator.GetAssoc(oper, r.Oper) is Operator.Assoc rAssoc && lAssoc == lrAssoc && rAssoc == lrAssoc && lrAssoc is not Operator.Assoc.None)
-			{
-				children = l.Children.JoinEnumerable(r.Children);
-			}
-			else if (left is ArithExpr l_ && Operator.GetAssoc(l_.Oper, oper) is not Operator.Assoc.None)
-			{
-				children = right.JoinAfter(l_.Children);
-			}
-			else if (right is ArithExpr r_ && Operator.GetAssoc(oper, r_.Oper) is not Operator.Assoc.None)
-			{
-				children = left.JoinBefore(r_.Children);
-			}
-			else
-			{
-				children = new[] { left, right };
-			}
-			return new(oper, children);
-		}
+		public Expression? Child { get; set; }
+		public ParensExpr(Expression? child) => Child = child;
 
-		public override string? ToString()
-		{
-			var childStrs = Children?.Select(ch => ch?.ToString(ToStringOptions.WithBrackets)) ?? Enumerable.Empty<string?>();
-			return Operator.IsUnary(Oper)
-				? $"{Oper}{childStrs.SingleOrDefault()}"
-				: string.Join(
-					Oper switch
-					{
-						Operator.Arith.Add => " + ",
-						Operator.Arith.Subtract => " - ",
-						_ => null,
-					},
-					childStrs);
-		}
+		public override string? ToString() => ToString($"{Child}");
 	}
 
 	public class CompExpr : Expression
@@ -144,17 +104,117 @@ namespace GrammarParser.Demo.Parsers.Sql
 		public Operator.Comp? Oper { get; set; }
 		public Expression? Left { get; set; }
 		public Expression? Right { get; set; }
-		public CompExpr(Operator.Comp? oper, Expression? left, Expression? right)
+		public CompExpr(Expression? left, Operator.Comp? oper, Expression? right)
 		{
 			Oper = oper;
 			Left = left;
 			Right = right;
 		}
 
-		public override string? ToString() => $"{Left?.ToString(ToStringOptions.WithBrackets)} {Oper switch
+		public override string? ToString() =>
+			ToString($"{Left?.ToString(ToStringOptions.WithBrackets)}{Oper switch
+			{
+				Operator.Comp.Eq => " = ",
+				Operator.Comp.Ne => " <> ",
+				Operator.Comp.Lt => " < ",
+				Operator.Comp.Le => " <= ",
+				Operator.Comp.Gt => " > ",
+				Operator.Comp.Ge => " >= ",
+				_ => default,
+			}}{Right?.ToString(ToStringOptions.WithBrackets)}");
+	}
+
+	public class ArithExpr : Expression
+	{
+		public class Unit
 		{
-			Operator.Comp.Eq => "=",
-			_ => null,
-		}} {Right?.ToString(ToStringOptions.WithBrackets)}";
+			public Operator.Arith? Oper { get; set; }
+			public Expression? Expression { get; set; }
+			public Unit(Operator.Arith? oper, Expression? expression)
+			{
+				Oper = oper;
+				Expression = expression;
+			}
+		}
+
+		public IEnumerable<Unit?>? Children { get; set; }
+		public ArithExpr(IEnumerable<Unit?>? children) => Children = children;
+		public static ArithExpr Binary(Expression? left, Operator.Arith? oper, Expression? right)
+			=> new(new Unit[] { new(null, left), new(oper, right) });
+		public static ArithExpr Unary(Operator.Arith? oper, Expression? right)
+			=> new(new Unit(oper, right).Array());
+		public static ArithExpr JoinRest(Expression? expression, Operator.Arith? oper, ArithExpr? other)
+		{
+			var unit = new Unit(null, expression);
+			var nextUnit = other?.Children?.Any() is true
+				? new Unit(oper, other?.Children?.FirstOrDefault()?.Expression)
+				: null;
+			var restChildren = other?.Children?.Skip(1);
+			return new(new[] { unit, nextUnit }.ConcatBefore(restChildren));
+		}
+
+		public bool IsUnary => Children?.FirstOrDefault()?.Oper is not null;
+
+		public override string? ToString()
+		{
+			var childStrs = Children?
+				.Select(ch => $"{ch?.Oper switch
+				{
+					Operator.Arith.Add => " + ",
+					Operator.Arith.Subtract => " - ",
+					Operator.Arith.Multiply => " * ",
+					Operator.Arith.Divide => " / ",
+					Operator.Arith.Negative => "-",
+					_ => default,
+				}}{ch?.Expression?.ToString(ToStringOptions.WithBrackets)}")
+				?? Enumerable.Empty<string?>();
+			return ToString(string.Concat(childStrs));
+		}
+	}
+
+	public class LogicalExpr : Expression
+	{
+		public class Unit
+		{
+			public Operator.Logical? Oper { get; set; }
+			public Expression? Expression { get; set; }
+			public Unit(Operator.Logical? oper, Expression? expression)
+			{
+				Oper = oper;
+				Expression = expression;
+			}
+		}
+
+		public IEnumerable<Unit?>? Children { get; set; }
+		public LogicalExpr(IEnumerable<Unit?>? children) => Children = children;
+		public static LogicalExpr Binary(Expression? left, Operator.Logical? oper, Expression? right)
+			=> new(new Unit[] { new(null, left), new(oper, right) });
+		public static LogicalExpr Unary(Operator.Logical? oper, Expression? right)
+			=> new(new Unit(oper, right).Array());
+		public static LogicalExpr JoinRest(Expression? expression, Operator.Logical? oper, LogicalExpr? other)
+		{
+			var unit = new Unit(null, expression);
+			var nextUnit = other?.Children?.Any() is true
+				? new Unit(oper, other?.Children?.FirstOrDefault()?.Expression)
+				: null;
+			var restChildren = other?.Children?.Skip(1);
+			return new(new[] { unit, nextUnit }.ConcatBefore(restChildren));
+		}
+
+		public bool IsUnary => Children?.FirstOrDefault()?.Oper is not null;
+
+		public override string? ToString()
+		{
+			var childStrs = Children?
+				.Select(ch => $"{ch?.Oper switch
+				{
+					Operator.Logical.And => " AND ",
+					Operator.Logical.Or => " OR ",
+					Operator.Logical.Not => "NOT ",
+					_ => default,
+				}}{ch?.Expression?.ToString(ToStringOptions.WithBrackets)}")
+				?? Enumerable.Empty<string?>();
+			return ToString(string.Concat(childStrs));
+		}
 	}
 }

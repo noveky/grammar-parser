@@ -25,26 +25,26 @@
 				Console.ResetColor();
 			}
 		}
-		public static void PrintLn(object? obj = null, ConsoleColor? color = null)
-			=> Print($"{obj}\n", color);
+		public static void PrintLn(object? obj = null, ConsoleColor? color = null) =>
+			Print($"{obj}\n", color);
 
-		public static void LogWarning(string message)
-			=> PrintLn(message, ConsoleColor.DarkYellow);
+		public static void LogWarning(string message) =>
+			PrintLn(message, ConsoleColor.DarkYellow);
 
-		public static void LogWarning(string? prompt, string message)
-			=> LogWarning($"{prompt}{colon}{message}");
+		public static void LogWarning(string? prompt, string message) =>
+			LogWarning($"{prompt}{colon}{message}");
 
-		public static void LogError(string message)
-			=> PrintLn(message, ConsoleColor.DarkRed);
+		public static void LogError(string message) =>
+			PrintLn(message, ConsoleColor.DarkRed);
 
-		public static void LogError(Exception ex)
-			=> LogError(ex.Message);
+		public static void LogError(Exception ex) =>
+			LogError(ex.Message);
 
-		public static void LogError(string? prompt, string message)
-			=> LogError($"{prompt}{colon}{message}");
+		public static void LogError(string? prompt, string message) =>
+			LogError($"{prompt}{colon}{message}");
 
-		public static void LogError(string? prompt, Exception ex)
-			=> LogError(prompt, ex.Message);
+		public static void LogError(string? prompt, Exception ex) =>
+			LogError(prompt, ex.Message);
 
 		public static T? Input<T>(string? prompt = null, ConsoleColor? promptColor = null, ConsoleColor? inputColor = null, bool isSecure = false)
 		{
@@ -103,8 +103,8 @@
 			}
 		}
 
-		public static T? SecureInput<T>(string? prompt = null, ConsoleColor? promptColor = null, ConsoleColor? inputColor = null)
-			=> Input<T>(prompt, promptColor, inputColor, true);
+		public static T? SecureInput<T>(string? prompt = null, ConsoleColor? promptColor = null, ConsoleColor? inputColor = null) =>
+			Input<T>(prompt, promptColor, inputColor, true);
 
 		public static bool AskYesNo(string? prompt = null)
 		{
@@ -122,11 +122,11 @@
 			return Input<T>("| ", ConsoleColor.DarkGray, inputColor ?? ConsoleColor.White, isSecure);
 		}
 
-		public static T? SecureField<T>(string fieldName, ConsoleColor? fieldNameColor = null)
-			=> InputField<T>(fieldName, fieldNameColor, null, true);
+		public static T? SecureField<T>(string fieldName, ConsoleColor? fieldNameColor = null) =>
+			InputField<T>(fieldName, fieldNameColor, null, true);
 
-		public static void List(IEnumerable<object> objects, ConsoleColor? color = null)
-			=> objects.ToList().ForEach(obj => PrintLn(obj, color));
+		public static void List(IEnumerable<object> objects, ConsoleColor? color = null) =>
+			objects.ToList().ForEach(obj => PrintLn(obj, color));
 
 		public static void Pause(string? prompt = null)
 		{
@@ -134,8 +134,8 @@
 			Console.ReadKey();
 		}
 
-		public static void PrintDivider(int length = 32)
-			=> PrintLn(new string('-', length));
+		public static void PrintDivider(int length = 32) =>
+			PrintLn(new string('-', length));
 
 		public static bool Try(Action action, Action? after = null)
 		{
