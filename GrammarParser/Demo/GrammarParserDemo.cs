@@ -8,7 +8,7 @@ namespace GrammarParser.Demo
 		public static void Run()
 		{
 			Context.AppName = "Grammar Parser Demo";
-			GrammarParser.LogDebug = true;
+			GeneralParser.LogDebug = true;
 
 			Page.Show<SqlParserPage>();
 		}

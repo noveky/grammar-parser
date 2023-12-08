@@ -6,7 +6,7 @@ namespace GrammarParser.Demo.Parsers.Sql
 {
 	public class SqlParser
 	{
-		readonly GrammarParser sqlParser = new();
+		readonly GeneralParser sqlParser = new();
 
 		public SqlParser()
 		{
@@ -329,7 +329,7 @@ namespace GrammarParser.Demo.Parsers.Sql
 			{
 				var __ = restRelations.NewChild<SequenceNode>();
 				__.SetChildren(commaToken, relation, restRelations);
-				__.Builder = a => a[1].PrependTo<Relation?>(restRelations);
+				__.Builder = a => a[1].PrependTo<Relation?>(a[2]);
 			}
 
 			var from = new MultipleNode("from");

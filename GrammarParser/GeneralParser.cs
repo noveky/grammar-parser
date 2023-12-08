@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace GrammarParser
 {
-	public class GrammarParser
+	public class GeneralParser
 	{
 		public static bool LogDebug { get; set; } = false;
 
@@ -113,7 +113,7 @@ namespace GrammarParser
 				str = str[match.Length..];
 				if (!Ignore)
 				{
-					Debug.WriteLineIf(GrammarParser.LogDebug, $"Got token `{token}`", "Tokenization");
+					Debug.WriteLineIf(GeneralParser.LogDebug, $"Got token `{token}`", "Tokenization");
 					tokens.Add(token);
 				}
 			}
@@ -151,7 +151,7 @@ namespace GrammarParser
 		public EmptyNode() : this(null) { }
 		public IEnumerable<object?> Parse(TokenStream tokens)
 		{
-			Debug.WriteLineIf(GrammarParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{null}`");
+			Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{null}`");
 			yield return null;
 		}
 	}
@@ -175,11 +175,11 @@ namespace GrammarParser
 			var token = tokens.Next();
 			if (token is null || token.Type != TokenType)
 			{
-				Debug.WriteLineIf(GrammarParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields nothing");
+				Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields nothing");
 				yield break;
 			}
 			var result = Builder?.Invoke(token);
-			Debug.WriteLineIf(GrammarParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{result}`");
+			Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{result}`");
 			yield return result;
 		}
 	}
@@ -202,14 +202,14 @@ namespace GrammarParser
 		{
 			if (childIndex >= Children.Count) yield break;
 			var ch = Children[childIndex];
-			Debug.WriteLineIf(GrammarParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` calls `{ch}.Parse` at child {childIndex} `{Children[childIndex]}`");
+			Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` calls `{ch}.Parse` at child {childIndex} `{Children[childIndex]}`");
 			foreach (var chResult in ch.Parse(tokens))
 			{
 				int checkpoint = tokens.Index;
 				var chResultAsArray = new[] { chResult };
 				if (childIndex == Children.Count - 1)
 				{
-					Debug.WriteLineIf(GrammarParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
+					Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
 					yield return chResultAsArray;
 				}
 				else
@@ -217,7 +217,7 @@ namespace GrammarParser
 					tokens.Index = checkpoint;
 					foreach (var restResults in ParseRecursive(tokens, childIndex + 1))
 					{
-						Debug.WriteLineIf(GrammarParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
+						Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
 						yield return chResultAsArray.Concat(restResults);
 					}
 				}
@@ -227,7 +227,7 @@ namespace GrammarParser
 		{
 			foreach (var childrenResults in ParseRecursive(tokens, 0))
 			{
-				Debug.WriteLineIf(GrammarParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{childrenResults}`");
+				Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{childrenResults}`");
 				yield return Builder?.Invoke(childrenResults.ToArray());
 			}
 		}
@@ -264,10 +264,10 @@ namespace GrammarParser
 			foreach (var ch in Children)
 			{
 				tokens.Index = checkpoint;
-				Debug.WriteLineIf(GrammarParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` calls `{ch}.Parse`");
+				Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` calls `{ch}.Parse`");
 				foreach (var result in ch.Parse(tokens))
 				{
-					Debug.WriteLineIf(GrammarParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{result}`");
+					Debug.WriteLineIf(GeneralParser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{result}`");
 					yield return result;
 				}
 			}
