@@ -33,8 +33,11 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			var dotToken = Parser.NewToken("dot", @"\.");
 			var starToken = Parser.NewToken("star", @"\*");
 			var eqToken = Parser.NewToken("eq", @"=");
+			var neToken = Parser.NewToken("ne", @"<>");
 			var ltToken = Parser.NewToken("lt", @"<");
-			var gtToken = Parser.NewToken("ge", @">");
+			var leToken = Parser.NewToken("le", @"<=");
+			var gtToken = Parser.NewToken("gt", @">");
+			var geToken = Parser.NewToken("ge", @">=");
 			var plusToken = Parser.NewToken("plus", @"\+");
 			var minusToken = Parser.NewToken("minus", @"-");
 			var multiplyToken = Parser.NewToken("multiply", @"\*");
@@ -113,7 +116,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			}
 			{
 				var __ = compOper.NewChild<SequenceNode>("ne");
-				__.SetChildren(ltToken, gtToken);
+				__.SetChildren(neToken);
 				__.Builder = a => Operator.Comp.Ne;
 			}
 			{
@@ -123,7 +126,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			}
 			{
 				var __ = compOper.NewChild<SequenceNode>("le");
-				__.SetChildren(ltToken, eqToken);
+				__.SetChildren(leToken);
 				__.Builder = a => Operator.Comp.Le;
 			}
 			{
@@ -133,7 +136,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			}
 			{
 				var __ = compOper.NewChild<SequenceNode>("ge");
-				__.SetChildren(gtToken, eqToken);
+				__.SetChildren(geToken);
 				__.Builder = a => Operator.Comp.Ge;
 			}
 

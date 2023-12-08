@@ -176,11 +176,6 @@ namespace SyntaxParser
 		public Func<object?[], object?>? Builder { get; set; }
 		public SequenceNode(string? name = null) => Name = new(GetType(), name);
 		public SequenceNode() : this(null) { }
-		public TChild NewChild<TChild>(TChild child) where TChild : ISyntaxNode
-		{
-			Children.Add(child);
-			return child;
-		}
 		public void SetChildren(params ISyntaxNode[] children) => Children = children.ToList();
 		IEnumerable<IEnumerable<object?>> ParseRecursive(InputStream stream, int childIndex)
 		{
