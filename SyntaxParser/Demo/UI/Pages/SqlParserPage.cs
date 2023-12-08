@@ -18,18 +18,24 @@ namespace SyntaxParser.Demo.UI.Pages
 				try
 				{
 					string sql = IO.Input<string>("Enter sql", ConsoleColor.DarkGray, ConsoleColor.White) ?? string.Empty;
-					var results = sqlParser.Parse(sql).ToArray();
-					if (results.Length == 0)
+					var resultIter = sqlParser.Parse(sql).GetEnumerator();
+					if (!resultIter.MoveNext())
 					{
 						IO.LogError("Error", "Failed to parse sql");
 						continue;
 					}
-					if (results.Length > 1)
+					IO.PrintLn("Parsed result:", ConsoleColor.DarkGray);
+					IO.PrintLn(resultIter.Current);
+					if (resultIter.MoveNext())
 					{
-						IO.LogWarning("Warning", "Ambiguous syntax rule");
+						IO.LogWarning("Warning", "Ambiguous syntax");
+						IO.PrintLn("Other possible results:", ConsoleColor.DarkGray);
+						do
+						{
+							IO.PrintLn(string.Join(",\n", resultIter.Current));
+						}
+						while (resultIter.MoveNext());
 					}
-					IO.PrintLn("Parsed results:", ConsoleColor.DarkGray);
-					IO.PrintLn(string.Join(",\n", results));
 				}
 				finally
 				{
