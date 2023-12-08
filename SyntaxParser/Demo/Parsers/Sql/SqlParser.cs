@@ -15,8 +15,8 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			// Tokens (order by precedence desc)
 
 			var blankToken = parser.NewToken("blank", @"\s+", null, ignore: true);
-			var unsignedDecimalToken = parser.NewToken("unsignedDecimal", @"\d+\.\d+", t => decimal.Parse(t.Value));
-			var unsignedIntToken = parser.NewToken("unsignedInt", @"\d+", t => int.Parse(t.Value));
+			var uDecimalToken = parser.NewToken("uDecimal", @"\d+\.\d+", t => decimal.Parse(t.Value));
+			var uIntToken = parser.NewToken("uInt", @"\d+", t => int.Parse(t.Value));
 			var selectToken = parser.NewToken("select", @"SELECT");
 			var fromToken = parser.NewToken("from", @"FROM");
 			var whereToken = parser.NewToken("where", @"WHERE");
@@ -44,12 +44,12 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			var value = new MultipleNode("value");
 			{
 				var __ = value.NewChild<SequenceNode>();
-				__.SetChildren(unsignedIntToken);
+				__.SetChildren(uIntToken);
 				__.Builder = a => new Value(a[0].AsInt());
 			}
 			{
 				var __ = value.NewChild<SequenceNode>();
-				__.SetChildren(unsignedDecimalToken);
+				__.SetChildren(uDecimalToken);
 				__.Builder = a => new Value(a[0].AsDecimal());
 			}
 
