@@ -181,17 +181,17 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			{
 				var __ = expr4.NewChild<SequenceNode>("valueExpr");
 				__.SetChildren(value);
-				__.Builder = a => new ValueExpr(a[0].As<Value?>());
+				__.Builder = a => new ValueExpr(a[0].As<Value>());
 			}
 			{
 				var __ = expr4.NewChild<SequenceNode>("attrExpr");
 				__.SetChildren(attr);
-				__.Builder = a => new AttrExpr(a[0].As<Attr?>());
+				__.Builder = a => new AttrExpr(a[0].As<Attr>());
 			}
 			{
 				var __ = expr4.NewChild<SequenceNode>("parensExpr");
 				__.SetChildren(lParenToken, expression, rParenToken);
-				__.Builder = a => new ParensExpr(a[1].As<Expression?>());
+				__.Builder = a => new ParensExpr(a[1].As<Expression>());
 			}
 
 			var expr3 = new MultipleNode("expr3");
@@ -203,8 +203,8 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				__.SetChildren(unaryArithOper, expr4);
 				__.Builder = a =>
 				{
-					var _unaryArithOper = a[0].As<Operator.Arith?>();
-					var _expr4 = a[1].As<Expression?>();
+					var _unaryArithOper = a[0].As<Operator.Arith>();
+					var _expr4 = a[1].As<Expression>();
 					return OperatorExpr<Operator.Arith>.Unary(_unaryArithOper, _expr4);
 				};
 			}
@@ -218,9 +218,9 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				__.SetChildren(expr3, binaryArithOper, expr2);
 				__.Builder = a =>
 				{
-					var _expr3 = a[0].As<Expression?>();
-					var _binaryArithOper = a[1].As<Operator.Arith?>();
-					var _expr2 = a[2].As<Expression?>();
+					var _expr3 = a[0].As<Expression>();
+					var _binaryArithOper = a[1].As<Operator.Arith>();
+					var _expr2 = a[2].As<Expression>();
 					return _expr2 is OperatorExpr<Operator.Arith> other && !other.IsUnary
 						? OperatorExpr<Operator.Arith>.JoinRest(_expr3, _binaryArithOper, other)
 						: OperatorExpr<Operator.Arith>.Binary(_expr3, _binaryArithOper, _expr2);
@@ -236,9 +236,9 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				__.SetChildren(expr2, compOper, expr1);
 				__.Builder = a => OperatorExpr<Operator.Comp>.Binary
 				(
-					left: a[0].As<Expression?>(),
-					oper: a[1].As<Operator.Comp?>(),
-					right: a[2].As<Expression?>()
+					left: a[0].As<Expression>(),
+					oper: a[1].As<Operator.Comp>(),
+					right: a[2].As<Expression>()
 				);
 			}
 
@@ -251,8 +251,8 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				__.SetChildren(unaryLogicalOper, expr1);
 				__.Builder = a =>
 				{
-					var _unaryLogicalOper = a[0].As<Operator.Logical?>();
-					var _expr1 = a[1].As<Expression?>();
+					var _unaryLogicalOper = a[0].As<Operator.Logical>();
+					var _expr1 = a[1].As<Expression>();
 					return OperatorExpr<Operator.Logical>.Unary(_unaryLogicalOper, _expr1);
 				};
 			}
@@ -266,9 +266,9 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				__.SetChildren(expr0, binaryLogicalOper, expression);
 				__.Builder = a =>
 				{
-					var _expr0 = a[0].As<Expression?>();
-					var _binaryLogicalOper = a[1].As<Operator.Logical?>();
-					var _expression = a[2].As<Expression?>();
+					var _expr0 = a[0].As<Expression>();
+					var _binaryLogicalOper = a[1].As<Operator.Logical>();
+					var _expression = a[2].As<Expression>();
 					return _expression is OperatorExpr<Operator.Logical> other && !other.IsUnary
 						? OperatorExpr<Operator.Logical>.JoinRest(_expr0, _binaryLogicalOper, other)
 						: OperatorExpr<Operator.Logical>.Binary(_expr0, _binaryLogicalOper, _expression);
@@ -281,7 +281,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				__.SetChildren(expression, asAlias);
 				__.Builder = a =>
 				{
-					var _expression = a[0].As<Expression?>();
+					var _expression = a[0].As<Expression>();
 					var _asAlias = a[1].AsString();
 					if (_expression is not null) _expression.Alias = _asAlias;
 					return _expression;
@@ -295,7 +295,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			{
 				var __ = restSelectExprs.NewChild<SequenceNode>();
 				__.SetChildren(commaToken, selectExpr, restSelectExprs);
-				__.Builder = a => a[1].PrependTo<Expression?>(a[2]);
+				__.Builder = a => a[1].PrependTo<Expression>(a[2]);
 			}
 
 			var where = new MultipleNode("where");
@@ -329,7 +329,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			{
 				var __ = restRelations.NewChild<SequenceNode>();
 				__.SetChildren(commaToken, relation, restRelations);
-				__.Builder = a => a[1].PrependTo<Relation?>(a[2]);
+				__.Builder = a => a[1].PrependTo<Relation>(a[2]);
 			}
 
 			var from = new MultipleNode("from");
@@ -339,7 +339,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			{
 				var __ = from.NewChild<SequenceNode>();
 				__.SetChildren(fromToken, relation, restRelations);
-				__.Builder = a => a[1].PrependTo<Relation?>(a[2]);
+				__.Builder = a => a[1].PrependTo<Relation>(a[2]);
 			}
 
 			var selectStmt = new SequenceNode("selectStmt");
@@ -348,9 +348,9 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				__.SetChildren(selectToken, selectExpr, restSelectExprs, from, where);
 				__.Builder = a =>
 				{
-					var _from = a[3].AsEnumerable<Relation?>();
-					var _where = a[4].As<Expression?>();
-					var selectExprs = a[1].PrependTo<Expression?>(a[2]);
+					var _from = a[3].AsEnumerable<Relation>();
+					var _where = a[4].As<Expression>();
+					var selectExprs = a[1].PrependTo<Expression>(a[2]);
 					return new SelectSqlNode
 					{
 						Expressions = selectExprs,
