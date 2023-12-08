@@ -6,34 +6,36 @@ namespace SyntaxParser.Demo.Parsers.Sql
 {
 	public class SqlParser
 	{
-		readonly Parser sqlParser = new();
+		readonly Parser parser = new();
 
 		public SqlParser()
 		{
+			parser.IgnoreCase = true;
+
 			// Tokens (order by precedence desc)
 
-			var blankToken = sqlParser.NewToken("blank", @"\s+", null, ignore: true);
-			var unsignedDecimalToken = sqlParser.NewToken("unsignedDecimal", @"\d+\.\d+", t => decimal.Parse(t.Value));
-			var unsignedIntToken = sqlParser.NewToken("unsignedInt", @"\d+", t => int.Parse(t.Value));
-			var selectToken = sqlParser.NewToken("select", @"SELECT");
-			var fromToken = sqlParser.NewToken("from", @"FROM");
-			var whereToken = sqlParser.NewToken("where", @"WHERE");
-			var asToken = sqlParser.NewToken("as", @"AS");
-			var andToken = sqlParser.NewToken("and", @"AND");
-			var orToken = sqlParser.NewToken("or", @"OR");
-			var notToken = sqlParser.NewToken("not", @"NOT");
-			var idToken = sqlParser.NewToken("id", @"[A-Za-z_]+[A-Za-z0-9_]*", t => t.Value);
-			var lParenToken = sqlParser.NewToken("lParen", @"\(");
-			var rParenToken = sqlParser.NewToken("rParen", @"\)");
-			var commaToken = sqlParser.NewToken("comma", @",");
-			var dotToken = sqlParser.NewToken("dot", @"\.");
-			var starToken = sqlParser.NewToken("star", @"\*");
-			var slashToken = sqlParser.NewToken("slash", @"/");
-			var eqToken = sqlParser.NewToken("eq", @"=");
-			var ltToken = sqlParser.NewToken("lt", @"<");
-			var gtToken = sqlParser.NewToken("ge", @">");
-			var plusToken = sqlParser.NewToken("plus", @"\+");
-			var minusToken = sqlParser.NewToken("minus", @"-");
+			var blankToken = parser.NewToken("blank", @"\s+", null, ignore: true);
+			var unsignedDecimalToken = parser.NewToken("unsignedDecimal", @"\d+\.\d+", t => decimal.Parse(t.Value));
+			var unsignedIntToken = parser.NewToken("unsignedInt", @"\d+", t => int.Parse(t.Value));
+			var selectToken = parser.NewToken("select", @"SELECT");
+			var fromToken = parser.NewToken("from", @"FROM");
+			var whereToken = parser.NewToken("where", @"WHERE");
+			var asToken = parser.NewToken("as", @"AS");
+			var andToken = parser.NewToken("and", @"AND");
+			var orToken = parser.NewToken("or", @"OR");
+			var notToken = parser.NewToken("not", @"NOT");
+			var idToken = parser.NewToken("id", @"[A-Za-z_]+[A-Za-z0-9_]*", t => t.Value);
+			var lParenToken = parser.NewToken("lParen", @"\(");
+			var rParenToken = parser.NewToken("rParen", @"\)");
+			var commaToken = parser.NewToken("comma", @",");
+			var dotToken = parser.NewToken("dot", @"\.");
+			var starToken = parser.NewToken("star", @"\*");
+			var slashToken = parser.NewToken("slash", @"/");
+			var eqToken = parser.NewToken("eq", @"=");
+			var ltToken = parser.NewToken("lt", @"<");
+			var gtToken = parser.NewToken("ge", @">");
+			var plusToken = parser.NewToken("plus", @"\+");
+			var minusToken = parser.NewToken("minus", @"-");
 
 			// Syntax nodes
 
@@ -78,7 +80,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			{
 				var __ = attr.NewChild<SequenceNode>();
 				__.SetChildren(fieldName);
-				__.Builder = a => new Attribute()
+				__.Builder = a => new Attr()
 				{
 					FieldName = a[0].AsString(),
 				};
@@ -86,7 +88,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			{
 				var __ = attr.NewChild<SequenceNode>();
 				__.SetChildren(idToken, dotToken, fieldName);
-				__.Builder = a => new Attribute()
+				__.Builder = a => new Attr()
 				{
 					RelationName = a[0].AsString(),
 					FieldName = a[2].AsString(),
@@ -184,7 +186,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			{
 				var __ = expr4.NewChild<SequenceNode>("attrExpr");
 				__.SetChildren(attr);
-				__.Builder = a => new AttrExpr(a[0].As<Attribute?>());
+				__.Builder = a => new AttrExpr(a[0].As<Attr?>());
 			}
 			{
 				var __ = expr4.NewChild<SequenceNode>("parensExpr");
@@ -364,10 +366,9 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				__.SetChildren(selectStmt);
 			}
 
-			sqlParser.RootSyntaxNode = stmt;
-			sqlParser.IgnoreCase = true;
+			parser.RootSyntaxNode = stmt;
 		}
 
-		public IEnumerable<object?> Parse(string str) => sqlParser.Parse(str);
+		public IEnumerable<object?> Parse(string str) => parser.Parse(str);
 	}
 }

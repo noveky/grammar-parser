@@ -19,7 +19,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public override string? ToString() => $"{Name}{(Alias is null ? null : $" (alias: {Alias})")}";
 	}
 
-	public class Attribute
+	public class Attr
 	{
 		public string? RelationName { get; set; }
 		public string? FieldName { get; set; }
@@ -84,10 +84,10 @@ namespace SyntaxParser.Demo.Parsers.Sql
 
 	public class AttrExpr : Expression
 	{
-		public Attribute? Attribute { get; set; }
-		public AttrExpr(Attribute? attribute) => Attribute = attribute;
+		public Attr? Attr { get; set; }
+		public AttrExpr(Attr? attr) => Attr = attr;
 
-		public override string? ToString() => ToString($"{Attribute}");
+		public override string? ToString() => ToString($"{Attr}");
 	}
 
 	public class ParensExpr : Expression

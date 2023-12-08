@@ -151,7 +151,7 @@ namespace SyntaxParser
 		public EmptyNode() : this(null) { }
 		public IEnumerable<object?> Parse(TokenStream tokens)
 		{
-			Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{null}`");
+			Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{tokens.Current?.Value}\"",-16}`{this}.Parse` yields `{null}`");
 			yield return null;
 		}
 	}
@@ -175,11 +175,11 @@ namespace SyntaxParser
 			var token = tokens.Next();
 			if (token is null || token.Type != TokenType)
 			{
-				Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields nothing");
+				Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{tokens.Current?.Value}\"",-16}`{this}.Parse` yields nothing");
 				yield break;
 			}
 			var result = Builder?.Invoke(token);
-			Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{result}`");
+			Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{tokens.Current?.Value}\"",-16}`{this}.Parse` yields `{result}`");
 			yield return result;
 		}
 	}
@@ -202,14 +202,14 @@ namespace SyntaxParser
 		{
 			if (childIndex >= Children.Count) yield break;
 			var ch = Children[childIndex];
-			Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` calls `{ch}.Parse` at child {childIndex} `{Children[childIndex]}`");
+			Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{tokens.Current?.Value}\"",-16}`{this}.ParseRecursive` calls `{ch}.Parse` at child {childIndex} `{Children[childIndex]}`");
 			foreach (var chResult in ch.Parse(tokens))
 			{
 				int checkpoint = tokens.Index;
 				var chResultAsArray = new[] { chResult };
 				if (childIndex == Children.Count - 1)
 				{
-					Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
+					Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{tokens.Current?.Value}\"",-16}`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
 					yield return chResultAsArray;
 				}
 				else
@@ -217,7 +217,7 @@ namespace SyntaxParser
 					tokens.Index = checkpoint;
 					foreach (var restResults in ParseRecursive(tokens, childIndex + 1))
 					{
-						Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
+						Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{tokens.Current?.Value}\"",-16}`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
 						yield return chResultAsArray.Concat(restResults);
 					}
 				}
@@ -227,7 +227,7 @@ namespace SyntaxParser
 		{
 			foreach (var childrenResults in ParseRecursive(tokens, 0))
 			{
-				Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{childrenResults}`");
+				Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{tokens.Current?.Value}\"",-16}`{this}.Parse` yields `{childrenResults}`");
 				yield return Builder?.Invoke(childrenResults.ToArray());
 			}
 		}
@@ -264,10 +264,10 @@ namespace SyntaxParser
 			foreach (var ch in Children)
 			{
 				tokens.Index = checkpoint;
-				Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` calls `{ch}.Parse`");
+				Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{tokens.Current?.Value}\"",-16}`{this}.Parse` calls `{ch}.Parse`");
 				foreach (var result in ch.Parse(tokens))
 				{
-					Debug.WriteLineIf(Parser.LogDebug, $"@\"{tokens.Current?.Value}\"\t`{this}.Parse` yields `{result}`");
+					Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{tokens.Current?.Value}\"",-16}`{this}.Parse` yields `{result}`");
 					yield return result;
 				}
 			}
