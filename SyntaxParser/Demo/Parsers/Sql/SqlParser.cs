@@ -17,9 +17,9 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			var @uint = Parser.NewToken("uint", @"\b\d+\b", t => int.Parse(t.Value));
 			var @true = Parser.NewToken("true", @"\bTRUE\b", t => true);
 			var @false = Parser.NewToken("false", @"\bFALSE\b", t => false);
-			var select = Parser.NewToken("select", @"\bSELECT\b");
-			var from = Parser.NewToken("from", @"\bFROM\b");
-			var where = Parser.NewToken("where", @"\bWHERE\b");
+			var @select = Parser.NewToken("select", @"\bSELECT\b");
+			var @from = Parser.NewToken("from", @"\bFROM\b");
+			var @where = Parser.NewToken("where", @"\bWHERE\b");
 			var @as = Parser.NewToken("as", @"\bAS\b");
 			var and = Parser.NewToken("and", @"\bAND\b");
 			var or = Parser.NewToken("or", @"\bOR\b");
