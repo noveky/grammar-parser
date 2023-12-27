@@ -8,8 +8,8 @@ namespace SyntaxParser.Demo.Parsers.Sql
 
 		public SqlParser()
 		{
-			parser.IgnoreCase = true; // Ignore case
-			parser.SkipPattern = @"\s+"; // Skip whitespace
+			parser.IgnoreCase = true;
+			parser.IgnorePattern = @"\s+";
 
 			// Tokens
 
