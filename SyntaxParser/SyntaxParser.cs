@@ -1,4 +1,4 @@
-﻿using SyntaxParser.Shared;
+using SyntaxParser.Shared;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
