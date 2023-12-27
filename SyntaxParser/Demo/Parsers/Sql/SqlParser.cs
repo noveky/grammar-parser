@@ -13,33 +13,33 @@ namespace SyntaxParser.Demo.Parsers.Sql
 
 			// Tokens
 
-			var udecimal = parser.NewToken("udecimal", @"\b\d+\.\d+\b", t => decimal.Parse(t.Value));
-			var @uint = parser.NewToken("uint", @"\b\d+\b", t => int.Parse(t.Value));
-			var @true = parser.NewToken("true", @"\bTRUE\b", t => true);
-			var @false = parser.NewToken("false", @"\bFALSE\b", t => false);
-			var @select = parser.NewToken("select", @"\bSELECT\b");
-			var @from = parser.NewToken("from", @"\bFROM\b");
-			var @where = parser.NewToken("where", @"\bWHERE\b");
-			var @as = parser.NewToken("as", @"\bAS\b");
-			var and = parser.NewToken("and", @"\bAND\b");
-			var or = parser.NewToken("or", @"\bOR\b");
-			var not = parser.NewToken("not", @"\bNOT\b");
-			var id = parser.NewToken("id", @"\b[A-Za-z_]+[A-Za-z0-9_]*\b", t => t.Value);
-			var lParen = parser.NewToken("lParen", @"\(");
-			var rParen = parser.NewToken("rParen", @"\)");
-			var comma = parser.NewToken("comma", @",");
-			var dot = parser.NewToken("dot", @"\.");
-			var star = parser.NewToken("star", @"\*");
-			var eq = parser.NewToken("eq", @"=");
-			var ne = parser.NewToken("ne", @"<>");
-			var lt = parser.NewToken("lt", @"<");
-			var le = parser.NewToken("le", @"<=");
-			var gt = parser.NewToken("gt", @">");
-			var ge = parser.NewToken("ge", @">=");
-			var plus = parser.NewToken("plus", @"\+");
-			var minus = parser.NewToken("minus", @"-");
-			var multiply = parser.NewToken("multiply", @"\*");
-			var divide = parser.NewToken("divide", @"/");
+			var udecimal = Parser.NewToken("udecimal", @"\b\d+\.\d+\b", t => decimal.Parse(t.Value));
+			var @uint = Parser.NewToken("uint", @"\b\d+\b", t => int.Parse(t.Value));
+			var @true = Parser.NewToken("true", @"\bTRUE\b", t => true);
+			var @false = Parser.NewToken("false", @"\bFALSE\b", t => false);
+			var @select = Parser.NewToken("select", @"\bSELECT\b");
+			var @from = Parser.NewToken("from", @"\bFROM\b");
+			var @where = Parser.NewToken("where", @"\bWHERE\b");
+			var @as = Parser.NewToken("as", @"\bAS\b");
+			var and = Parser.NewToken("and", @"\bAND\b");
+			var or = Parser.NewToken("or", @"\bOR\b");
+			var not = Parser.NewToken("not", @"\bNOT\b");
+			var id = Parser.NewToken("id", @"\b[A-Za-z_]+[A-Za-z0-9_]*\b", t => t.Value);
+			var lParen = Parser.NewToken("lParen", @"\(");
+			var rParen = Parser.NewToken("rParen", @"\)");
+			var comma = Parser.NewToken("comma", @",");
+			var dot = Parser.NewToken("dot", @"\.");
+			var star = Parser.NewToken("star", @"\*");
+			var eq = Parser.NewToken("eq", @"=");
+			var ne = Parser.NewToken("ne", @"<>");
+			var lt = Parser.NewToken("lt", @"<");
+			var le = Parser.NewToken("le", @"<=");
+			var gt = Parser.NewToken("gt", @">");
+			var ge = Parser.NewToken("ge", @">=");
+			var plus = Parser.NewToken("plus", @"\+");
+			var minus = Parser.NewToken("minus", @"-");
+			var multiply = Parser.NewToken("multiply", @"\*");
+			var divide = Parser.NewToken("divide", @"/");
 
 			id.CoverBy(@true, @false);
 
