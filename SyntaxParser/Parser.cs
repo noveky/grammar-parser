@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using SyntaxParser.Shared;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 
@@ -8,111 +9,93 @@ namespace SyntaxParser
 	{
 		public static bool LogDebug { get; set; } = false;
 
+		readonly List<TokenType> tokenTypes = new();
+
 		public ISyntaxNode? RootSyntaxNode { get; set; }
 		public bool IgnoreCase { get; set; } = false;
 		public string? SkipPattern { get; set; }
-		public bool DynamicRegexMatch { get; set; } = false;
 
 		public RegexOptions RegexOptions => IgnoreCase ? RegexOptions.IgnoreCase : RegexOptions.None;
 
-		public static TokenNode NewToken(string? name, string regex, Func<Token, object?>? builder = null)
+		public TokenNode NewToken(string? name, string regex, Func<Token, object?>? builder = null)
 		{
 			TokenType tokenType = new(name, regex);
+			tokenTypes.Add(tokenType);
 			return new TokenNode(name, tokenType, builder);
+		}
+
+		IEnumerable<IEnumerable<Token>> TokenizeRecursive(string str)
+		{
+			if (str.Length == 0)
+			{
+				yield return Enumerable.Empty<Token>();
+				yield break;
+			}
+			foreach (var type in tokenTypes)
+			{
+				if (SkipPattern is not null)
+				{
+					var skipLen = Regex.Match(str, $"^{SkipPattern}", RegexOptions).Length;
+					str = str[skipLen..];
+				}
+				var match = Regex.Match(str, $"^{type.RegexPattern}", RegexOptions);
+				if (!match.Success)
+				{
+					continue;
+				}
+				var matchLen = match.Length;
+				var token = new Token(type, match.Value);
+				foreach (var restTokens in TokenizeRecursive(str[matchLen..]))
+				{
+					yield return token.PrependTo(restTokens);
+				}
+			}
 		}
 
 		public IEnumerable<object?> Parse(string str)
 		{
 			if (RootSyntaxNode is null) throw new InvalidOperationException();
-			var inputStream = new InputStream(this, str);
-			IParserStream stream = DynamicRegexMatch ? inputStream : new TokenStream(inputStream);
+			var tokenss = TokenizeRecursive(str);
+			var streams = tokenss.Select(tokens => new TokenStream(this, tokens));
 			Debug.WriteLineIf(LogDebug, "Start to parse input string", "Parser");
-			foreach (var result in RootSyntaxNode.Parse(stream))
+			foreach (var stream in streams)
 			{
-				if (!stream.AtEnd)
+				foreach (var result in RootSyntaxNode.Parse(stream))
 				{
-					Debug.WriteLineIf(LogDebug, $"Discard result `{result}` for unparsed portion", "Parser");
-					continue;
+					if (!stream.AtEnd)
+					{
+						Debug.WriteLineIf(LogDebug, $"Discard result `{result}` for {stream.Rest.Count()} unparsed tokens", "Parser");
+						continue;
+					}
+					Debug.WriteLineIf(LogDebug, $"Accept result `{result}`", "Parser");
+					yield return result;
 				}
-				Debug.WriteLineIf(LogDebug, $"Accept result `{result}`", "Parser");
-				yield return result;
 			}
 		}
 	}
 
-	public interface IParserStream
+	public class TokenStream
 	{
+		public Token[] Tokens { get; }
 		public Parser Parser { get; }
-		public int Index { get; set; }
-		public bool AtBegin { get; }
-		public bool AtEnd { get; }
-		public object? Current { get; }
-		public Token? NextToken(TokenType? type);
-	}
-
-	public class TokenStream : IParserStream
-	{
-		readonly Token[] tokens;
-		public Parser Parser { get; }
-		public Token this[int index] => tokens[index];
-		public IEnumerable<Token> this[Range range] => tokens[range];
+		public Token this[int index] => Tokens[index];
+		public IEnumerable<Token> this[Range range] => Tokens[range];
 		public int Index { get; set; } = -1;
 		public TokenStream(Parser parser, IEnumerable<Token> tokens)
 		{
 			Parser = parser;
-			this.tokens = tokens.ToArray();
-		}
-		public TokenStream(InputStream inputStream)
-		{
-			throw new NotImplementedException();
+			Tokens = tokens.ToArray();
 		}
 		public bool AtBegin => Index < 0 &&
 			(Index == -1 ? true : throw new IndexOutOfRangeException());
-		public bool AtEnd => Index >= tokens.Length - 1 &&
-			(Index == tokens.Length - 1 ? true : throw new IndexOutOfRangeException());
-		public object? Current => AtBegin ? null : tokens[Index];
+		public bool AtEnd => Index >= Tokens.Length - 1 &&
+			(Index == Tokens.Length - 1 ? true : throw new IndexOutOfRangeException());
+		public Token? Current => AtBegin ? null : Tokens[Index];
+		public IEnumerable<Token> Rest => AtEnd ? Enumerable.Empty<Token>() : this[Index..];
 		public Token? NextToken(TokenType? type)
 		{
-			var token = AtEnd ? null : tokens[++Index];
+			var token = AtEnd ? null : Tokens[++Index];
 			return token?.Type == type ? token : null;
-		}
-	}
-
-	public class InputStream : IParserStream
-	{
-		readonly string str;
-		public Parser Parser { get; }
-		public char this[int index] => str[index];
-		public string this[Range range] => str[range];
-		public int Index { get; set; } = 0;
-		public InputStream(Parser parser, string str)
-		{
-			Parser = parser;
-			this.str = str;
-		}
-		public bool AtBegin => Index <= 0 &&
-			(Index == 0 ? true : throw new IndexOutOfRangeException());
-		public bool AtEnd => Index >= str.Length &&
-			(Index == str.Length ? true : throw new IndexOutOfRangeException());
-		public object? Current => AtEnd ? null : str[Index];
-		public string? Rest => AtEnd ? null : this[Index..];
-		public Token? NextToken(TokenType? type)
-		{
-			if (type is null || AtEnd || Rest is null) return null;
-
-			if (Parser.SkipPattern is not null)
-			{
-				Index += Regex.Match(Rest, $"^{Parser.SkipPattern}", Parser.RegexOptions).Length;
-			}
-
-			var match = Regex.Match(Rest, $"^{type.RegexPattern}", Parser.RegexOptions);
-			if (!match.Success)
-			{
-				return null;
-			}
-			Index += match.Length;
-
-			return new Token(type, match.Value);
 		}
 	}
 
@@ -135,6 +118,7 @@ namespace SyntaxParser
 
 	public class TokenType : INameable
 	{
+		public List<TokenType> CoverTypes { get; } = new();
 		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}(\"{RegexPattern}\")";
 		public string RegexPattern { get; }
@@ -142,6 +126,10 @@ namespace SyntaxParser
 		{
 			Name = new(GetType(), name);
 			RegexPattern = regex;
+		}
+		public void CoverBy(params TokenNode[]? nodes)
+		{
+			nodes?.Where(node => node.TokenType is not null).ToList().ForEach(node => CoverTypes.Add(node.TokenType!));
 		}
 	}
 
@@ -170,7 +158,7 @@ namespace SyntaxParser
 
 	public interface ISyntaxNode : INameable
 	{
-		public IEnumerable<object?> Parse(IParserStream stream);
+		public IEnumerable<object?> Parse(TokenStream stream);
 	}
 
 	public class EmptyNode : ISyntaxNode
@@ -184,7 +172,7 @@ namespace SyntaxParser
 			Builder = builder;
 		}
 		public EmptyNode() : this(null) { }
-		public IEnumerable<object?> Parse(IParserStream stream)
+		public IEnumerable<object?> Parse(TokenStream stream)
 		{
 			Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields `{null}`");
 			yield return null;
@@ -193,33 +181,25 @@ namespace SyntaxParser
 
 	public class TokenNode : ISyntaxNode
 	{
-		readonly List<TokenType> coverTokenTypes = new();
 		public InstanceName Name { get; set; }
 		public override string? ToString() => $"{Name}";
-		public TokenType? TokenType { get; set; }
+		public TokenType TokenType { get; set; }
 		public Func<Token, object?>? Builder { get; set; }
-		public TokenNode(string? name = null, TokenType? tokenType = null, Func<Token, object?>? builder = null)
+		public TokenNode(string? name, TokenType tokenType, Func<Token, object?>? builder = null)
 		{
 			Name = new(GetType(), name);
 			TokenType = tokenType;
 			Builder = builder;
 		}
-		public TokenNode() : this(null) { }
-		public void CoverBy(params TokenNode[]? nodes)
-		{
-			nodes?.Where(node => node.TokenType is not null).ToList().ForEach(node => coverTokenTypes.Add(node.TokenType!));
-		}
-		public IEnumerable<object?> Parse(IParserStream stream)
+		public TokenNode(TokenType tokenType, Func<Token, object?>? builder = null) : this(null, tokenType, builder) { }
+		public void CoverBy(params TokenNode[]? nodes) => TokenType.CoverBy(nodes);
+		public IEnumerable<object?> Parse(TokenStream stream)
 		{
 			var token = stream.NextToken(TokenType);
 			if (token is null)
 			{
 				Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields nothing");
 				yield break;
-			}
-			foreach (var type in coverTokenTypes)
-			{
-				if (Regex.IsMatch(token.Value, type.RegexPattern, stream.Parser.RegexOptions)) yield break;
 			}
 			var result = Builder?.Invoke(token);
 			Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields `{result}`");
@@ -237,7 +217,7 @@ namespace SyntaxParser
 		public SequenceNode() : this(null) { }
 		public void SetChildren(params ISyntaxNode[] children) => Children = children.ToList();
 		public SequenceNode WithChildren(params ISyntaxNode[] children) { SetChildren(children); return this; }
-		IEnumerable<IEnumerable<object?>> ParseRecursive(IParserStream stream, int childIndex)
+		IEnumerable<IEnumerable<object?>> ParseRecursive(TokenStream stream, int childIndex)
 		{
 			if (childIndex >= Children.Count) yield break;
 
@@ -246,11 +226,10 @@ namespace SyntaxParser
 			foreach (var chResult in ch.Parse(stream))
 			{
 				int checkpoint = stream.Index;
-				var chResultAsArray = new[] { chResult };
 				if (childIndex == Children.Count - 1)
 				{
 					Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
-					yield return chResultAsArray;
+					yield return chResult.Array();
 				}
 				else
 				{
@@ -258,12 +237,12 @@ namespace SyntaxParser
 					foreach (var restResults in ParseRecursive(stream, childIndex + 1))
 					{
 						Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
-						yield return chResultAsArray.Concat(restResults);
+						yield return chResult.PrependTo(restResults);
 					}
 				}
 			}
 		}
-		public IEnumerable<object?> Parse(IParserStream stream)
+		public IEnumerable<object?> Parse(TokenStream stream)
 		{
 			foreach (var childrenResults in ParseRecursive(stream, 0))
 			{
@@ -280,8 +259,8 @@ namespace SyntaxParser
 		public List<ISyntaxNode> Branches { get; set; } = new();
 		public Func<object?, object?>? Converter { get; set; } = null;
 		public MultipleNode(string? name = null) => Name = new(GetType(), name);
-		public MultipleNode(string? name = null, params ISyntaxNode[] branches) : this(name) => SetBranches(branches);
 		public MultipleNode() : this(null) { }
+		public MultipleNode(string? name = null, params ISyntaxNode[] branches) : this(name) => SetBranches(branches);
 		string? RenameBranch(ISyntaxNode branch, int index) =>
 			branch.Name.Value ??= $"{Name}_{branch.Name.Value ?? index.ToString()}";
 		public TBranch AddBranch<TBranch>(TBranch branch) where TBranch : ISyntaxNode
@@ -308,7 +287,7 @@ namespace SyntaxParser
 			_ = Branches.Select(RenameBranch);
 		}
 		public MultipleNode WithBranches(params ISyntaxNode[] branches) { SetBranches(branches); return this; }
-		public IEnumerable<object?> Parse(IParserStream stream)
+		public IEnumerable<object?> Parse(TokenStream stream)
 		{
 			var checkpoint = stream.Index;
 			foreach (var br in Branches)
