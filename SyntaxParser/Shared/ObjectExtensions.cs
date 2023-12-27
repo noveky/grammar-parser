@@ -19,12 +19,12 @@
 			(obj ?? Enumerable.Empty<T?>()).Concat(other ?? Enumerable.Empty<T?>());
 		public static IEnumerable<T?> ConcatBefore<T>(this object? obj, object? other) =>
 			ConcatBefore(obj.AsEnumerable<T?>(), other.AsEnumerable<T?>());
-		public static IEnumerable<T?> AppendTo<T>(this T? obj, IEnumerable<T?>? other) =>
-			(other ?? Enumerable.Empty<T?>()).Append(obj);
+		public static IEnumerable<T> AppendTo<T>(this T obj, IEnumerable<T>? other) =>
+			(other ?? Enumerable.Empty<T>()).Append(obj);
 		public static IEnumerable<T?> AppendTo<T>(this object? obj, object? other) =>
 			AppendTo(obj.As<T?>(), other.AsEnumerable<T?>());
-		public static IEnumerable<T?> PrependTo<T>(this T? obj, IEnumerable<T?>? other) =>
-			(other ?? Enumerable.Empty<T?>()).Prepend(obj);
+		public static IEnumerable<T> PrependTo<T>(this T obj, IEnumerable<T>? other) =>
+			(other ?? Enumerable.Empty<T>()).Prepend(obj);
 		public static IEnumerable<T?> PrependTo<T>(this object? obj, object? other) =>
 			PrependTo(obj.As<T?>(), other.AsEnumerable<T?>());
 	}

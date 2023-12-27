@@ -4,11 +4,11 @@ namespace SyntaxParser.Demo.Parsers.Sql
 {
 	public class SelectSqlNode
 	{
-		public IEnumerable<Expr?>? Exprs { get; set; }
-		public IEnumerable<Relation?>? Relations { get; set; }
+		public IEnumerable<Expr?>? Columns { get; set; }
+		public IEnumerable<Relation?>? Tables { get; set; }
 		public Expr? Condition { get; set; }
 
-		public override string? ToString() => $"{GetType().Name} {{\n\texpressions: [\n\t\t{string.Join(",\n\t\t", Exprs ?? Enumerable.Empty<Expr?>())}\n\t],\n\trelations: [\n\t\t{string.Join(",\n\t\t", Relations ?? Enumerable.Empty<Relation?>())}\n\t],\n\tcondition: {Condition?.ToString() ?? "null"}\n}}";
+		public override string? ToString() => $"{GetType().Name} {{\n\tcolumns: [\n\t\t{string.Join(",\n\t\t", Columns ?? Enumerable.Empty<Expr?>())}\n\t],\n\ttables: [\n\t\t{string.Join(",\n\t\t", Tables ?? Enumerable.Empty<Relation?>())}\n\t],\n\tcondition: {Condition?.ToString() ?? "null"}\n}}";
 	}
 
 	public class Relation

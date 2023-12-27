@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using SyntaxParser.Shared;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 namespace SyntaxParser
@@ -9,7 +10,7 @@ namespace SyntaxParser
 
 		public ISyntaxNode? RootSyntaxNode { get; set; }
 		public bool IgnoreCase { get; set; } = false;
-		public string? IgnorePattern { get; set; }
+		public string? SkipPattern { get; set; }
 
 		public RegexOptions RegexOptions => IgnoreCase? RegexOptions.IgnoreCase : RegexOptions.None;
 
@@ -22,13 +23,14 @@ namespace SyntaxParser
 		public IEnumerable<object?> Parse(string str)
 		{
 			if (RootSyntaxNode is null) throw new InvalidOperationException();
+
 			var stream = new InputStream(this, str);
 			Debug.WriteLineIf(LogDebug, "Start to parse input string", "Parser");
 			foreach (var result in RootSyntaxNode.Parse(stream))
 			{
 				if (!stream.AtEnd)
 				{
-					Debug.WriteLineIf(LogDebug, $"Discard result `{result}` for unparsed portion: \"{stream[(stream.Index + 1)..]}\"", "Parser");
+					Debug.WriteLineIf(LogDebug, $"Discard result `{result}` for unparsed portion: \"{stream.Rest}\"", "Parser");
 					continue;
 				}
 				Debug.WriteLineIf(LogDebug, $"Accept result `{result}`", "Parser");
@@ -54,14 +56,14 @@ namespace SyntaxParser
 		public bool AtEnd => Index >= str.Length &&
 			(Index == str.Length ? true : throw new IndexOutOfRangeException());
 		public char? Current => AtEnd ? null : str[Index];
-		public string? Rest => AtEnd ? null : this[Index..];
+		public string Rest => AtEnd ? string.Empty : this[Index..];
 		public Token? NextToken(TokenType? type)
 		{
-			if (type is null || AtEnd || Rest is null) return null;
+			if (type is null || AtEnd) return null;
 
-			if (Parser.IgnorePattern is not null)
+			if (Parser.SkipPattern is not null)
 			{
-				Index += Regex.Match(Rest, $"^{Parser.IgnorePattern}", Parser.RegexOptions).Length;
+				Index += Regex.Match(Rest, $"^{Parser.SkipPattern}", Parser.RegexOptions).Length;
 			}
 
 			var match = Regex.Match(Rest, $"^{type.RegexPattern}", Parser.RegexOptions);
@@ -69,18 +71,26 @@ namespace SyntaxParser
 			{
 				return null;
 			}
+			foreach (var coverType in type.CoverTypes)
+			{
+				if (Regex.IsMatch(match.Value, coverType.RegexPattern, Parser.RegexOptions))
+				{
+					return null;
+				}
+			}
+
 			Index += match.Length;
 
 			return new Token(type, match.Value);
 		}
 	}
 
-	public class InstanceName
+	public class Name
 	{
 		readonly Type? type;
 		public string? Value { get; set; }
 		public override string? ToString() => Value ?? type?.Name;
-		public InstanceName(Type type, string? name = null)
+		public Name(Type type, string? name = null)
 		{
 			this.type = type;
 			Value = name;
@@ -89,12 +99,13 @@ namespace SyntaxParser
 
 	public interface INameable
 	{
-		public InstanceName Name { get; set; }
+		public Name Name { get; set; }
 	}
 
 	public class TokenType : INameable
 	{
-		public InstanceName Name { get; set; }
+		public List<TokenType> CoverTypes { get; } = new();
+		public Name Name { get; set; }
 		public override string? ToString() => $"{Name}(\"{RegexPattern}\")";
 		public string RegexPattern { get; }
 		public TokenType(string? name, string regex)
@@ -102,6 +113,7 @@ namespace SyntaxParser
 			Name = new(GetType(), name);
 			RegexPattern = regex;
 		}
+		public void CoverBy(IEnumerable<TokenType> types) => CoverTypes.AddRange(types);
 	}
 
 	public class Token
@@ -118,13 +130,39 @@ namespace SyntaxParser
 
 	public static class Syntax
 	{
-		public static EmptyNode Empty(string? name = null) => new(name);
+		public static EmptyNode Empty(string? name = "ε") => new(name);
 		public static SequenceNode Seq(string? name = null, params ISyntaxNode[] children) =>
 			new SequenceNode(name).WithChildren(children);
-		public static SequenceNode Seq(params ISyntaxNode[] children) => Seq(null, children);
 		public static MultipleNode Multi(string? name = null, params ISyntaxNode[] branches) =>
 			new MultipleNode(name).WithBranches(branches);
+
+		public static SequenceNode Seq(params ISyntaxNode[] children) => Seq(null, children);
 		public static MultipleNode Multi(params ISyntaxNode[] branches) => Multi(null, branches);
+
+		public static class Sugar
+		{
+			public static ISyntaxNode ListOf<T>(string? name, ISyntaxNode element, ISyntaxNode? separator = null)
+			{
+				var restElements = Multi();
+				{
+					_ = restElements.AddBranch(Empty());
+				}
+				{
+					var __ = restElements.AddBranch(separator is null ? Seq(element, restElements) : Seq(separator, element, restElements));
+					__.Builder = a => separator is null ? a[0].PrependTo<T>(a[1]) : a[1].PrependTo<T>(a[2]);
+				}
+
+				var elements = Seq(name);
+				{
+					var __ = elements.WithChildren(element, restElements);
+					__.Builder = a => a[0].PrependTo<T>(a[1]);
+				}
+
+				return elements;
+			}
+
+			public static ISyntaxNode ListOf<T>(ISyntaxNode element, ISyntaxNode? separator = null) => ListOf<T>(null, element, separator);
+		}
 	}
 
 	public interface ISyntaxNode : INameable
@@ -134,7 +172,7 @@ namespace SyntaxParser
 
 	public class EmptyNode : ISyntaxNode
 	{
-		public InstanceName Name { get; set; }
+		public Name Name { get; set; }
 		public override string? ToString() => $"{Name}";
 		public Func<object?>? Builder { get; set; }
 		public EmptyNode(string? name = null, Func<object?>? builder = null)
@@ -152,22 +190,18 @@ namespace SyntaxParser
 
 	public class TokenNode : ISyntaxNode
 	{
-		readonly List<TokenType> coverTokenTypes = new();
-		public InstanceName Name { get; set; }
+		public Name Name { get; set; }
 		public override string? ToString() => $"{Name}";
-		public TokenType? TokenType { get; set; }
+		public TokenType TokenType { get; set; }
 		public Func<Token, object?>? Builder { get; set; }
-		public TokenNode(string? name = null, TokenType? tokenType = null, Func<Token, object?>? builder = null)
+		public TokenNode(string? name, TokenType tokenType, Func<Token, object?>? builder = null)
 		{
 			Name = new(GetType(), name);
 			TokenType = tokenType;
 			Builder = builder;
 		}
-		public TokenNode() : this(null) { }
-		public void CoverBy(params TokenNode[]? nodes)
-		{
-			nodes?.Where(node => node.TokenType is not null).ToList().ForEach(node => coverTokenTypes.Add(node.TokenType!));
-		}
+		public TokenNode(TokenType tokenType, Func<Token, object?>? builder = null) : this(null, tokenType, builder) { }
+		public void CoverBy(params TokenNode[] nodes) => TokenType.CoverBy(nodes.Select(node => node.TokenType));
 		public IEnumerable<object?> Parse(InputStream stream)
 		{
 			var token = stream.NextToken(TokenType);
@@ -175,10 +209,6 @@ namespace SyntaxParser
 			{
 				Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields nothing");
 				yield break;
-			}
-			foreach (var type in coverTokenTypes)
-			{
-				if (Regex.IsMatch(token.Value, type.RegexPattern, stream.Parser.RegexOptions)) yield break;
 			}
 			var result = Builder?.Invoke(token);
 			Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields `{result}`");
@@ -188,7 +218,7 @@ namespace SyntaxParser
 
 	public class SequenceNode : ISyntaxNode
 	{
-		public InstanceName Name { get; set; }
+		public Name Name { get; set; }
 		public override string? ToString() => $"{Name}({string.Join(", ", Children.Select(ch => ch.Name))})";
 		public List<ISyntaxNode> Children { get; set; } = new();
 		public Func<object?[], object?>? Builder { get; set; }
@@ -234,7 +264,7 @@ namespace SyntaxParser
 
 	public class MultipleNode : ISyntaxNode
 	{
-		public InstanceName Name { get; set; }
+		public Name Name { get; set; }
 		public override string? ToString() => $"{Name}[{string.Join(" | ", Branches.Select(br => br.Name))}]";
 		public List<ISyntaxNode> Branches { get; set; } = new();
 		public Func<object?, object?>? Converter { get; set; } = null;
