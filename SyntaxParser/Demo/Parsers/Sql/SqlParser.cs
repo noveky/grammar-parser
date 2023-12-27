@@ -8,8 +8,8 @@ namespace SyntaxParser.Demo.Parsers.Sql
 
 		public SqlParser()
 		{
-			parser.IgnoreCase = true;
-			parser.IgnorePattern = @"\s+";
+			parser.IgnoreCase = true; // Ignore case
+			parser.SkipPattern = @"\s+"; // Skip whitespace
 
 			// Tokens
 
@@ -45,7 +45,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 
 			// Syntax nodes
 
-			var empty = Syntax.Empty("ε");
+			var empty = Syntax.Empty();
 
 			var value = Syntax.Multi("value");
 			{
@@ -272,14 +272,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				};
 			}
 
-			var restSelectExprs = Syntax.Multi("restSelectExprs");
-			{
-				_ = restSelectExprs.AddBranch(empty);
-			}
-			{
-				var __ = restSelectExprs.NewBranch(comma, selectExpr, restSelectExprs);
-				__.Builder = a => a[1].PrependTo<Expr>(a[2]);
-			}
+			var selectExprs = Syntax.Sugar.ListOf<Expr>("selectExpr", selectExpr, comma);
 
 			var whereClause = Syntax.Multi("whereClause");
 			{
@@ -300,36 +293,29 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				};
 			}
 
-			var restRelations = Syntax.Multi("restRelations");
-			{
-				_ = restRelations.AddBranch(empty);
-			}
-			{
-				var __ = restRelations.NewBranch(comma, relation, restRelations);
-				__.Builder = a => a[1].PrependTo<Relation>(a[2]);
-			}
+			var relations = Syntax.Sugar.ListOf<Relation>("relations", relation, comma);
 
 			var fromClause = Syntax.Multi("fromClause");
 			{
 				_ = fromClause.AddBranch(empty);
 			}
 			{
-				var __ = fromClause.NewBranch(from, relation, restRelations);
-				__.Builder = a => a[1].PrependTo<Relation>(a[2]);
+				var __ = fromClause.NewBranch(from, relations);
+				__.Builder = a => a[1];
 			}
 
 			var selectStmt = Syntax.Seq("selectStmt");
 			{
-				var __ = selectStmt.WithChildren(select, selectExpr, restSelectExprs, fromClause, whereClause);
+				var __ = selectStmt.WithChildren(select, selectExprs, fromClause, whereClause);
 				__.Builder = a =>
 				{
-					var _from = a[3].AsEnumerable<Relation>();
-					var _where = a[4].As<Expr>();
-					var selectExprs = a[1].PrependTo<Expr>(a[2]);
+					var _from = a[2].AsEnumerable<Relation>();
+					var _where = a[3].As<Expr>();
+					var _selectExprs = a[1].AsEnumerable<Expr>();
 					return new SelectSqlNode
 					{
-						Exprs = selectExprs,
-						Relations = _from,
+						Columns = _selectExprs,
+						Tables = _from,
 						Condition = _where,
 					};
 				};
