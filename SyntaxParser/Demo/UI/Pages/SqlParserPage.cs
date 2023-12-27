@@ -21,7 +21,7 @@ namespace SyntaxParser.Demo.UI.Pages
 					var resultIter = sqlParser.Parse(sql).GetEnumerator();
 					if (!resultIter.MoveNext())
 					{
-						IO.LogError("Error", "Failed to parse sql");
+						IO.LogError("Error", "Filter condition syntax error");
 						continue;
 					}
 					IO.PrintLn("Parsed result:", ConsoleColor.DarkGray);

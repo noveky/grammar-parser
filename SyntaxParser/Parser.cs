@@ -15,7 +15,6 @@ namespace SyntaxParser
 
 		public static TokenNode NewToken(string? name, string regex, Func<Token, object?>? builder = null)
 		{
-			name = $"{name}Token";
 			TokenType tokenType = new(name, regex);
 			return new TokenNode(name, tokenType, builder);
 		}
@@ -59,12 +58,20 @@ namespace SyntaxParser
 		public Token? NextToken(TokenType? type)
 		{
 			if (type is null || AtEnd || Rest is null) return null;
-			if (Parser.IgnorePattern is not null) Index += Regex.Match(Rest, $"^{Parser.IgnorePattern}", Parser.RegexOptions).Length;
+
+			if (Parser.IgnorePattern is not null)
+			{
+				Index += Regex.Match(Rest, $"^{Parser.IgnorePattern}", Parser.RegexOptions).Length;
+			}
+
 			var match = Regex.Match(Rest, $"^{type.RegexPattern}", Parser.RegexOptions);
-			if (!match.Success) return null;
-			var token = new Token(type, match.Value);
+			if (!match.Success)
+			{
+				return null;
+			}
 			Index += match.Length;
-			return token;
+
+			return new Token(type, match.Value);
 		}
 	}
 
@@ -107,6 +114,17 @@ namespace SyntaxParser
 			Type = type;
 			Value = value;
 		}
+	}
+
+	public static class Syntax
+	{
+		public static EmptyNode Empty(string? name = null) => new(name);
+		public static SequenceNode Seq(string? name = null, params ISyntaxNode[] children) =>
+			new SequenceNode(name).WithChildren(children);
+		public static SequenceNode Seq(params ISyntaxNode[] children) => Seq(null, children);
+		public static MultipleNode Multi(string? name = null, params ISyntaxNode[] branches) =>
+			new MultipleNode(name).WithBranches(branches);
+		public static MultipleNode Multi(params ISyntaxNode[] branches) => Multi(null, branches);
 	}
 
 	public interface ISyntaxNode : INameable
@@ -177,9 +195,11 @@ namespace SyntaxParser
 		public SequenceNode(string? name = null) => Name = new(GetType(), name);
 		public SequenceNode() : this(null) { }
 		public void SetChildren(params ISyntaxNode[] children) => Children = children.ToList();
+		public SequenceNode WithChildren(params ISyntaxNode[] children) { SetChildren(children); return this; }
 		IEnumerable<IEnumerable<object?>> ParseRecursive(InputStream stream, int childIndex)
 		{
 			if (childIndex >= Children.Count) yield break;
+
 			var ch = Children[childIndex];
 			Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.ParseRecursive` calls `{ch}.Parse` at child {childIndex} `{Children[childIndex]}`");
 			foreach (var chResult in ch.Parse(stream))
@@ -215,37 +235,46 @@ namespace SyntaxParser
 	public class MultipleNode : ISyntaxNode
 	{
 		public InstanceName Name { get; set; }
-		public override string? ToString() => $"{Name}[{string.Join(" | ", Children.Select(ch => ch.Name))}]";
-		public List<ISyntaxNode> Children { get; set; } = new();
+		public override string? ToString() => $"{Name}[{string.Join(" | ", Branches.Select(br => br.Name))}]";
+		public List<ISyntaxNode> Branches { get; set; } = new();
 		public Func<object?, object?>? Converter { get; set; } = null;
 		public MultipleNode(string? name = null) => Name = new(GetType(), name);
+		public MultipleNode(string? name = null, params ISyntaxNode[] branches) : this(name) => SetBranches(branches);
 		public MultipleNode() : this(null) { }
-		string? RenameChild(ISyntaxNode child, int index) =>
-			child.Name.Value ??= $"{Name}_{child.Name.Value ?? index.ToString()}";
-		public TChild NewChild<TChild>(TChild child) where TChild : ISyntaxNode
+		string? RenameBranch(ISyntaxNode branch, int index) =>
+			branch.Name.Value ??= $"{Name}_{branch.Name.Value ?? index.ToString()}";
+		public TBranch AddBranch<TBranch>(TBranch branch) where TBranch : ISyntaxNode
 		{
-			RenameChild(child, Children.Count);
-			Children.Add(child);
-			return child;
+			RenameBranch(branch, Branches.Count);
+			Branches.Add(branch);
+			return branch;
 		}
-		public TChild NewChild<TChild>(string? name = null) where TChild : ISyntaxNode, new()
+		public TBranch NewBranch<TBranch>(string? name = null) where TBranch : ISyntaxNode, new()
 		{
-			TChild child = new() { Name = new(typeof(TChild), name) };
-			return NewChild(child);
+			TBranch branch = new() { Name = new(typeof(TBranch), name) };
+			return AddBranch(branch);
 		}
-		public void SetChildren(params ISyntaxNode[] children)
+		public SequenceNode NewBranch(string? name = null, params ISyntaxNode[] sequence)
 		{
-			Children = children.ToList();
-			_ = Children.Select(RenameChild);
+			var branch = NewBranch<SequenceNode>(name);
+			branch.SetChildren(sequence);
+			return branch;
 		}
+		public SequenceNode NewBranch(params ISyntaxNode[] sequence) => NewBranch(null, sequence);
+		public void SetBranches(params ISyntaxNode[] branches)
+		{
+			Branches = branches.ToList();
+			_ = Branches.Select(RenameBranch);
+		}
+		public MultipleNode WithBranches(params ISyntaxNode[] branches) { SetBranches(branches); return this; }
 		public IEnumerable<object?> Parse(InputStream stream)
 		{
 			var checkpoint = stream.Index;
-			foreach (var ch in Children)
+			foreach (var br in Branches)
 			{
 				stream.Index = checkpoint;
-				Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` calls `{ch}.Parse`");
-				foreach (var result in ch.Parse(stream))
+				Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` calls `{br}.Parse`");
+				foreach (var result in br.Parse(stream))
 				{
 					Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields `{result}`");
 					yield return Converter is null ? result : Converter.Invoke(result);

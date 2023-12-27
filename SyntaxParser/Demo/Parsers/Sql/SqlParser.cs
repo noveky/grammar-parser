@@ -1,6 +1,4 @@
 ﻿using SyntaxParser.Shared;
-using System.Diagnostics;
-using System.Dynamic;
 
 namespace SyntaxParser.Demo.Parsers.Sql
 {
@@ -15,92 +13,87 @@ namespace SyntaxParser.Demo.Parsers.Sql
 
 			// Tokens
 
-			var uDecimalToken = Parser.NewToken("uDecimal", @"\b\d+\.\d+\b", t => decimal.Parse(t.Value));
-			var uIntToken = Parser.NewToken("uInt", @"\b\d+\b", t => int.Parse(t.Value));
-			var trueToken = Parser.NewToken("true", @"\bTRUE\b", t => true);
-			var falseToken = Parser.NewToken("false", @"\bFALSE\b", t => false);
-			var selectToken = Parser.NewToken("select", @"\bSELECT\b");
-			var fromToken = Parser.NewToken("from", @"\bFROM\b");
-			var whereToken = Parser.NewToken("where", @"\bWHERE\b");
-			var asToken = Parser.NewToken("as", @"\bAS\b");
-			var andToken = Parser.NewToken("and", @"\bAND\b");
-			var orToken = Parser.NewToken("or", @"\bOR\b");
-			var notToken = Parser.NewToken("not", @"\bNOT\b");
-			var idToken = Parser.NewToken("id", @"\b[A-Za-z_]+[A-Za-z0-9_]*\b", t => t.Value);
-			var lParenToken = Parser.NewToken("lParen", @"\(");
-			var rParenToken = Parser.NewToken("rParen", @"\)");
-			var commaToken = Parser.NewToken("comma", @",");
-			var dotToken = Parser.NewToken("dot", @"\.");
-			var starToken = Parser.NewToken("star", @"\*");
-			var eqToken = Parser.NewToken("eq", @"=");
-			var neToken = Parser.NewToken("ne", @"<>");
-			var ltToken = Parser.NewToken("lt", @"<");
-			var leToken = Parser.NewToken("le", @"<=");
-			var gtToken = Parser.NewToken("gt", @">");
-			var geToken = Parser.NewToken("ge", @">=");
-			var plusToken = Parser.NewToken("plus", @"\+");
-			var minusToken = Parser.NewToken("minus", @"-");
-			var multiplyToken = Parser.NewToken("multiply", @"\*");
-			var divideToken = Parser.NewToken("divide", @"/");
+			var udecimal = Parser.NewToken("udecimal", @"\b\d+\.\d+\b", t => decimal.Parse(t.Value));
+			var @uint = Parser.NewToken("uint", @"\b\d+\b", t => int.Parse(t.Value));
+			var @true = Parser.NewToken("true", @"\bTRUE\b", t => true);
+			var @false = Parser.NewToken("false", @"\bFALSE\b", t => false);
+			var select = Parser.NewToken("select", @"\bSELECT\b");
+			var from = Parser.NewToken("from", @"\bFROM\b");
+			var where = Parser.NewToken("where", @"\bWHERE\b");
+			var @as = Parser.NewToken("as", @"\bAS\b");
+			var and = Parser.NewToken("and", @"\bAND\b");
+			var or = Parser.NewToken("or", @"\bOR\b");
+			var not = Parser.NewToken("not", @"\bNOT\b");
+			var id = Parser.NewToken("id", @"\b[A-Za-z_]+[A-Za-z0-9_]*\b", t => t.Value);
+			var lParen = Parser.NewToken("lParen", @"\(");
+			var rParen = Parser.NewToken("rParen", @"\)");
+			var comma = Parser.NewToken("comma", @",");
+			var dot = Parser.NewToken("dot", @"\.");
+			var star = Parser.NewToken("star", @"\*");
+			var eq = Parser.NewToken("eq", @"=");
+			var ne = Parser.NewToken("ne", @"<>");
+			var lt = Parser.NewToken("lt", @"<");
+			var le = Parser.NewToken("le", @"<=");
+			var gt = Parser.NewToken("gt", @">");
+			var ge = Parser.NewToken("ge", @">=");
+			var plus = Parser.NewToken("plus", @"\+");
+			var minus = Parser.NewToken("minus", @"-");
+			var multiply = Parser.NewToken("multiply", @"\*");
+			var divide = Parser.NewToken("divide", @"/");
 
-			idToken.CoverBy(trueToken, falseToken);
+			id.CoverBy(@true, @false);
 
 			// Syntax nodes
 
-			var empty = new EmptyNode("ε");
+			var empty = Syntax.Empty("ε");
 
-			var value = new MultipleNode("value");
+			var value = Syntax.Multi("value");
 			{
-				var __ = value.NewChild<SequenceNode>();
-				__.SetChildren(uIntToken);
+				var __ = value.NewBranch();
+				__.SetChildren(@uint);
 				__.Builder = a => new Value(a[0].AsInt());
 			}
 			{
-				var __ = value.NewChild<SequenceNode>();
-				__.SetChildren(uDecimalToken);
+				var __ = value.NewBranch(udecimal);
 				__.Builder = a => new Value(a[0].AsDecimal());
 			}
 			{
-				var __ = value.NewChild<MultipleNode>();
-				__.SetChildren(trueToken, falseToken);
+				var __ = value.NewBranch<MultipleNode>();
+				__.SetBranches(@true, @false);
 				__.Converter = o => new Value(o.AsBool());
 			}
 
-			var asAlias = new MultipleNode("asAlias");
+			var asAlias = Syntax.Multi("asAlias");
 			{
-				var __ = asAlias.NewChild(empty);
+				_ = asAlias.AddBranch(empty);
 			}
 			{
-				var __ = asAlias.NewChild(idToken);
+				_ = asAlias.AddBranch(id);
 			}
 			{
-				var __ = asAlias.NewChild<SequenceNode>();
-				__.SetChildren(asToken, idToken);
+				var __ = asAlias.NewBranch(@as, id);
 				__.Builder = a => a[1];
 			}
 
-			var fieldName = new MultipleNode("fieldName");
+			var fieldName = Syntax.Multi("fieldName");
 			{
-				var __ = fieldName.NewChild<SequenceNode>();
-				__.SetChildren(starToken);
+				var __ = fieldName.NewBranch(star);
 				__.Builder = a => "*";
 			}
 			{
-				var __ = fieldName.NewChild(idToken);
+				_ = fieldName.AddBranch(id);
 			}
 
-			var attr = new MultipleNode("attr");
+			var attr = Syntax.Multi("attr");
 			{
-				var __ = attr.NewChild<SequenceNode>();
-				__.SetChildren(fieldName);
+				var __ = attr.NewBranch(fieldName);
 				__.Builder = a => new Attr()
 				{
 					FieldName = a[0].AsString(),
 				};
 			}
 			{
-				var __ = attr.NewChild<SequenceNode>();
-				__.SetChildren(idToken, dotToken, fieldName);
+				var __ = attr.NewBranch(id, dot, fieldName);
 				__.Builder = a => new Attr()
 				{
 					RelationName = a[0].AsString(),
@@ -108,276 +101,241 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				};
 			}
 
-			var compOper = new MultipleNode("compOper");
+			var compOper = Syntax.Multi("compOper");
 			{
-				var __ = compOper.NewChild<SequenceNode>("eq");
-				__.SetChildren(eqToken);
+				var __ = compOper.NewBranch(eq);
 				__.Builder = a => Operator.Comp.Eq;
 			}
 			{
-				var __ = compOper.NewChild<SequenceNode>("ne");
-				__.SetChildren(neToken);
+				var __ = compOper.NewBranch(ne);
 				__.Builder = a => Operator.Comp.Ne;
 			}
 			{
-				var __ = compOper.NewChild<SequenceNode>("lt");
-				__.SetChildren(ltToken);
+				var __ = compOper.NewBranch(lt);
 				__.Builder = a => Operator.Comp.Lt;
 			}
 			{
-				var __ = compOper.NewChild<SequenceNode>("le");
-				__.SetChildren(leToken);
+				var __ = compOper.NewBranch(le);
 				__.Builder = a => Operator.Comp.Le;
 			}
 			{
-				var __ = compOper.NewChild<SequenceNode>("gt");
-				__.SetChildren(gtToken);
+				var __ = compOper.NewBranch(gt);
 				__.Builder = a => Operator.Comp.Gt;
 			}
 			{
-				var __ = compOper.NewChild<SequenceNode>("ge");
-				__.SetChildren(geToken);
+				var __ = compOper.NewBranch(ge);
 				__.Builder = a => Operator.Comp.Ge;
 			}
 
-			var binaryArithOper = new MultipleNode("binaryArithOper");
+			var binaryArithOper = Syntax.Multi("binaryArithOper");
 			{
-				var __ = binaryArithOper.NewChild<SequenceNode>("add");
-				__.SetChildren(plusToken);
+				var __ = binaryArithOper.NewBranch(plus);
 				__.Builder = a => Operator.Arith.Add;
 			}
 			{
-				var __ = binaryArithOper.NewChild<SequenceNode>("subtract");
-				__.SetChildren(minusToken);
+				var __ = binaryArithOper.NewBranch(minus);
 				__.Builder = a => Operator.Arith.Subtract;
 			}
 			{
-				var __ = binaryArithOper.NewChild<SequenceNode>("multiply");
-				__.SetChildren(multiplyToken);
+				var __ = binaryArithOper.NewBranch(multiply);
 				__.Builder = a => Operator.Arith.Multiply;
 			}
 			{
-				var __ = binaryArithOper.NewChild<SequenceNode>("divide");
-				__.SetChildren(divideToken);
+				var __ = binaryArithOper.NewBranch(divide);
 				__.Builder = a => Operator.Arith.Divide;
 			}
 
-			var unaryArithOper = new MultipleNode("unaryArithOper");
+			var unaryArithOper = Syntax.Multi("unaryArithOper");
 			{
-				var __ = unaryArithOper.NewChild<SequenceNode>("negative");
-				__.SetChildren(minusToken);
+				var __ = unaryArithOper.NewBranch("negative", minus);
 				__.Builder = a => Operator.Arith.Negative;
 			}
 
-			var binaryLogicalOper = new MultipleNode("binaryLogicalOper");
+			var binaryLogicalOper = Syntax.Multi("binaryLogicalOper");
 			{
-				var __ = binaryLogicalOper.NewChild<SequenceNode>("and");
-				__.SetChildren(andToken);
+				var __ = binaryLogicalOper.NewBranch(and);
 				__.Builder = a => Operator.Logical.And;
 			}
 			{
-				var __ = binaryLogicalOper.NewChild<SequenceNode>("or");
-				__.SetChildren(orToken);
+				var __ = binaryLogicalOper.NewBranch(or);
 				__.Builder = a => Operator.Logical.Or;
 			}
 
-			var unaryLogicalOper = new MultipleNode("unaryLogicalOper");
+			var unaryLogicalOper = Syntax.Multi("unaryLogicalOper");
 			{
-				var __ = unaryLogicalOper.NewChild<SequenceNode>("not");
-				__.SetChildren(notToken);
+				var __ = unaryLogicalOper.NewBranch(not);
 				__.Builder = a => Operator.Logical.Not;
 			}
 
-			var expression = new MultipleNode("expression");
+			var expr = Syntax.Multi("expr");
 
-			var expr4 = new MultipleNode("expr4");
+			var expr4 = Syntax.Multi("expr4");
 			{
-				var __ = expr4.NewChild<SequenceNode>("valueExpr");
-				__.SetChildren(value);
+				var __ = expr4.NewBranch("valueExpr", value);
 				__.Builder = a => new ValueExpr(a[0].As<Value>());
 			}
 			{
-				var __ = expr4.NewChild<SequenceNode>("attrExpr");
-				__.SetChildren(attr);
+				var __ = expr4.NewBranch("attrExpr", attr);
 				__.Builder = a => new AttrExpr(a[0].As<Attr>());
 			}
 			{
-				var __ = expr4.NewChild<SequenceNode>("parensExpr");
-				__.SetChildren(lParenToken, expression, rParenToken);
-				__.Builder = a => new ParensExpr(a[1].As<Expression>());
+				var __ = expr4.NewBranch("parensExpr", lParen, expr, rParen);
+				__.Builder = a => new ParensExpr(a[1].As<Expr>());
 			}
 
-			var expr3 = new MultipleNode("expr3");
+			var expr3 = Syntax.Multi("expr3");
 			{
-				var __ = expr3.NewChild(expr4);
+				_ = expr3.AddBranch(expr4);
 			}
 			{
-				var __ = expr3.NewChild<SequenceNode>("unaryArithExpr");
-				__.SetChildren(unaryArithOper, expr4);
+				var __ = expr3.NewBranch("unaryArithExpr", unaryArithOper, expr4);
 				__.Builder = a =>
 				{
 					var _unaryArithOper = a[0].As<Operator.Arith>();
-					var _expr4 = a[1].As<Expression>();
+					var _expr4 = a[1].As<Expr>();
 					return OperatorExpr<Operator.Arith>.Unary(_unaryArithOper, _expr4);
 				};
 			}
 
-			var expr2 = new MultipleNode("expr2");
+			var expr2 = Syntax.Multi("expr2");
 			{
-				var __ = expr2.NewChild(expr3);
+				_ = expr2.AddBranch(expr3);
 			}
 			{
-				var __ = expr2.NewChild<SequenceNode>("binaryArithExpr");
-				__.SetChildren(expr3, binaryArithOper, expr2);
+				var __ = expr2.NewBranch("binaryArithExpr", expr3, binaryArithOper, expr2);
 				__.Builder = a =>
 				{
-					var _expr3 = a[0].As<Expression>();
+					var _expr3 = a[0].As<Expr>();
 					var _binaryArithOper = a[1].As<Operator.Arith>();
-					var _expr2 = a[2].As<Expression>();
+					var _expr2 = a[2].As<Expr>();
 					return _expr2 is OperatorExpr<Operator.Arith> other && !other.IsUnary
 						? OperatorExpr<Operator.Arith>.JoinRest(_expr3, _binaryArithOper, other)
 						: OperatorExpr<Operator.Arith>.Binary(_expr3, _binaryArithOper, _expr2);
 				};
 			}
 
-			var expr1 = new MultipleNode("expr1");
+			var expr1 = Syntax.Multi("expr1");
 			{
-				var __ = expr1.NewChild(expr2);
+				_ = expr1.AddBranch(expr2);
 			}
 			{
-				var __ = expr1.NewChild<SequenceNode>("compExpr");
-				__.SetChildren(expr2, compOper, expr1);
+				var __ = expr1.NewBranch("compExpr", expr2, compOper, expr1);
 				__.Builder = a => OperatorExpr<Operator.Comp>.Binary
 				(
-					left: a[0].As<Expression>(),
+					left: a[0].As<Expr>(),
 					oper: a[1].As<Operator.Comp>(),
-					right: a[2].As<Expression>()
+					right: a[2].As<Expr>()
 				);
 			}
 
-			var expr0 = new MultipleNode("expr0");
+			var expr0 = Syntax.Multi("expr0");
 			{
-				var __ = expr0.NewChild(expr1);
+				_ = expr0.AddBranch(expr1);
 			}
 			{
-				var __ = expr0.NewChild<SequenceNode>("unaryLogicalExpr");
-				__.SetChildren(unaryLogicalOper, expr1);
+				var __ = expr0.NewBranch("unaryLogicalExpr", unaryLogicalOper, expr1);
 				__.Builder = a =>
 				{
 					var _unaryLogicalOper = a[0].As<Operator.Logical>();
-					var _expr1 = a[1].As<Expression>();
+					var _expr1 = a[1].As<Expr>();
 					return OperatorExpr<Operator.Logical>.Unary(_unaryLogicalOper, _expr1);
 				};
 			}
 
-			_ = expression;
+			_ = expr;
 			{
-				var __ = expression.NewChild(expr0);
+				_ = expr.AddBranch(expr0);
 			}
 			{
-				var __ = expression.NewChild<SequenceNode>("binaryLogicalExpr");
-				__.SetChildren(expr0, binaryLogicalOper, expression);
+				var __ = expr.NewBranch("binaryLogicalExpr", expr0, binaryLogicalOper, expr);
 				__.Builder = a =>
 				{
-					var _expr0 = a[0].As<Expression>();
+					var _expr0 = a[0].As<Expr>();
 					var _binaryLogicalOper = a[1].As<Operator.Logical>();
-					var _expression = a[2].As<Expression>();
-					return _expression is OperatorExpr<Operator.Logical> other && !other.IsUnary
+					var _expr = a[2].As<Expr>();
+					return _expr is OperatorExpr<Operator.Logical> other && !other.IsUnary
 						? OperatorExpr<Operator.Logical>.JoinRest(_expr0, _binaryLogicalOper, other)
-						: OperatorExpr<Operator.Logical>.Binary(_expr0, _binaryLogicalOper, _expression);
+						: OperatorExpr<Operator.Logical>.Binary(_expr0, _binaryLogicalOper, _expr);
 				};
 			}
 
-			var selectExpr = new SequenceNode("selectExpr");
+			var selectExpr = Syntax.Seq("selectExpr");
 			{
 				var __ = selectExpr;
-				__.SetChildren(expression, asAlias);
+				__.SetChildren(expr, asAlias);
 				__.Builder = a =>
 				{
-					var _expression = a[0].As<Expression>();
+					var _expr = a[0].As<Expr>();
 					var _asAlias = a[1].AsString();
-					if (_expression is not null) _expression.Alias = _asAlias;
-					return _expression;
+					if (_expr is not null) _expr.Alias = _asAlias;
+					return _expr;
 				};
 			}
 
-			var restSelectExprs = new MultipleNode("restExpressions");
+			var restSelectExprs = Syntax.Multi("restSelectExprs");
 			{
-				var __ = restSelectExprs.NewChild(empty);
+				_ = restSelectExprs.AddBranch(empty);
 			}
 			{
-				var __ = restSelectExprs.NewChild<SequenceNode>();
-				__.SetChildren(commaToken, selectExpr, restSelectExprs);
-				__.Builder = a => a[1].PrependTo<Expression>(a[2]);
+				var __ = restSelectExprs.NewBranch(comma, selectExpr, restSelectExprs);
+				__.Builder = a => a[1].PrependTo<Expr>(a[2]);
 			}
 
-			var where = new MultipleNode("where");
+			var whereClause = Syntax.Multi("whereClause");
 			{
-				var __ = where.NewChild(empty);
+				_ = whereClause.AddBranch(empty);
 			}
 			{
-				var __ = where.NewChild<SequenceNode>();
-				__.SetChildren(whereToken, expression);
+				var __ = whereClause.NewBranch(where, expr);
 				__.Builder = a => a[1];
 			}
 
-			var relation = new SequenceNode("relation");
+			var relation = Syntax.Seq("relation");
 			{
-				var __ = relation;
-				__.SetChildren(idToken, asAlias);
-				__.Builder = a =>
+				var __ = relation.WithChildren(id, asAlias);
+				__.Builder = a => new Relation()
 				{
-					return new Relation()
-					{
-						Name = a[0].AsString(),
-						Alias = a[1].AsString(),
-					};
+					Name = a[0].AsString(),
+					Alias = a[1].AsString(),
 				};
 			}
 
-			var restRelations = new MultipleNode("restRelations");
+			var restRelations = Syntax.Multi("restRelations");
 			{
-				var __ = restRelations.NewChild(empty);
+				_ = restRelations.AddBranch(empty);
 			}
 			{
-				var __ = restRelations.NewChild<SequenceNode>();
-				__.SetChildren(commaToken, relation, restRelations);
+				var __ = restRelations.NewBranch(comma, relation, restRelations);
 				__.Builder = a => a[1].PrependTo<Relation>(a[2]);
 			}
 
-			var from = new MultipleNode("from");
+			var fromClause = Syntax.Multi("fromClause");
 			{
-				var __ = from.NewChild(empty);
+				_ = fromClause.AddBranch(empty);
 			}
 			{
-				var __ = from.NewChild<SequenceNode>();
-				__.SetChildren(fromToken, relation, restRelations);
+				var __ = fromClause.NewBranch(from, relation, restRelations);
 				__.Builder = a => a[1].PrependTo<Relation>(a[2]);
 			}
 
-			var selectStmt = new SequenceNode("selectStmt");
+			var selectStmt = Syntax.Seq("selectStmt");
 			{
-				var __ = selectStmt;
-				__.SetChildren(selectToken, selectExpr, restSelectExprs, from, where);
+				var __ = selectStmt.WithChildren(select, selectExpr, restSelectExprs, fromClause, whereClause);
 				__.Builder = a =>
 				{
 					var _from = a[3].AsEnumerable<Relation>();
-					var _where = a[4].As<Expression>();
-					var selectExprs = a[1].PrependTo<Expression>(a[2]);
+					var _where = a[4].As<Expr>();
+					var selectExprs = a[1].PrependTo<Expr>(a[2]);
 					return new SelectSqlNode
 					{
-						Expressions = selectExprs,
+						Exprs = selectExprs,
 						Relations = _from,
 						Condition = _where,
 					};
 				};
 			}
 
-			var stmt = new MultipleNode("stmt");
-			{
-				var __ = stmt;
-				__.SetChildren(selectStmt);
-			}
+			var stmt = Syntax.Multi("stmt", selectStmt);
 
 			parser.RootSyntaxNode = stmt;
 		}

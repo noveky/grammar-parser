@@ -4,11 +4,11 @@ namespace SyntaxParser.Demo.Parsers.Sql
 {
 	public class SelectSqlNode
 	{
-		public IEnumerable<Expression?>? Expressions { get; set; }
+		public IEnumerable<Expr?>? Exprs { get; set; }
 		public IEnumerable<Relation?>? Relations { get; set; }
-		public Expression? Condition { get; set; }
+		public Expr? Condition { get; set; }
 
-		public override string? ToString() => $"{GetType().Name} {{\n\texpressions: [\n\t\t{string.Join(",\n\t\t", Expressions ?? Enumerable.Empty<Expression?>())}\n\t],\n\trelations: [\n\t\t{string.Join(",\n\t\t", Relations ?? Enumerable.Empty<Relation?>())}\n\t],\n\tcondition: {Condition?.ToString() ?? "null"}\n}}";
+		public override string? ToString() => $"{GetType().Name} {{\n\texpressions: [\n\t\t{string.Join(",\n\t\t", Exprs ?? Enumerable.Empty<Expr?>())}\n\t],\n\trelations: [\n\t\t{string.Join(",\n\t\t", Relations ?? Enumerable.Empty<Relation?>())}\n\t],\n\tcondition: {Condition?.ToString() ?? "null"}\n}}";
 	}
 
 	public class Relation
@@ -42,13 +42,31 @@ namespace SyntaxParser.Demo.Parsers.Sql
 
 	public static class Operator
 	{
-		public enum Assoc { None, Left, Right }
 		public enum Comp { Undefined = 0 << 4, Eq, Ne, Lt, Le, Gt, Ge }
 		public enum Arith { Undefined = 1 << 4, Add, Subtract, Multiply, Divide, Negative }
 		public enum Logical { Undefined = 2 << 4, And, Or, Not }
+		public static string? ToString<TOperator>(TOperator? oper) where TOperator : struct, Enum =>
+			oper switch
+			{
+				Comp.Eq => " = ",
+				Comp.Ne => " <> ",
+				Comp.Lt => " < ",
+				Comp.Le => " <= ",
+				Comp.Gt => " > ",
+				Comp.Ge => " >= ",
+				Arith.Add => " + ",
+				Arith.Subtract => " - ",
+				Arith.Multiply => " * ",
+				Arith.Divide => " / ",
+				Arith.Negative => "-",
+				Logical.And => " AND ",
+				Logical.Or => " OR ",
+				Logical.Not => "NOT ",
+				_ => default,
+			};
 	}
 
-	public abstract class Expression
+	public abstract class Expr
 	{
 		public string? Alias { get; set; }
 
@@ -74,7 +92,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public override string? ToString() => $"{Alias}";
 	}
 
-	public class ValueExpr : Expression
+	public class ValueExpr : Expr
 	{
 		public Value? Value { get; set; }
 		public ValueExpr(Value? value) => Value = value;
@@ -82,7 +100,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public override string? ToString() => ToString($"{Value}");
 	}
 
-	public class AttrExpr : Expression
+	public class AttrExpr : Expr
 	{
 		public Attr? Attr { get; set; }
 		public AttrExpr(Attr? attr) => Attr = attr;
@@ -90,38 +108,38 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public override string? ToString() => ToString($"{Attr}");
 	}
 
-	public class ParensExpr : Expression
+	public class ParensExpr : Expr
 	{
-		public Expression? Child { get; set; }
-		public ParensExpr(Expression? child) => Child = child;
+		public Expr? Child { get; set; }
+		public ParensExpr(Expr? child) => Child = child;
 
 		public override string? ToString() => ToString($"{Child}");
 	}
 
-	public class OperatorExpr<TOperator> : Expression where TOperator: struct, Enum
+	public class OperatorExpr<TOperator> : Expr where TOperator: struct, Enum
 	{
 		public class Unit
 		{
 			public TOperator? Oper { get; set; }
-			public Expression? Expression { get; set; }
-			public Unit(TOperator? oper, Expression? expression)
+			public Expr? Expr { get; set; }
+			public Unit(TOperator? oper, Expr? expr)
 			{
 				Oper = oper;
-				Expression = expression;
+				Expr = expr;
 			}
 		}
 
 		public IEnumerable<Unit?>? Children { get; set; }
 		public OperatorExpr(IEnumerable<Unit?>? children) => Children = children;
-		public static OperatorExpr<TOperator> Binary(Expression? left, TOperator? oper, Expression? right)
+		public static OperatorExpr<TOperator> Binary(Expr? left, TOperator? oper, Expr? right)
 			=> new(new Unit[] { new(null, left), new(oper, right) });
-		public static OperatorExpr<TOperator> Unary(TOperator? oper, Expression? right)
+		public static OperatorExpr<TOperator> Unary(TOperator? oper, Expr? right)
 			=> new(new Unit(oper, right).Array());
-		public static OperatorExpr<TOperator> JoinRest(Expression? expression, TOperator? oper, OperatorExpr<TOperator>? other)
+		public static OperatorExpr<TOperator> JoinRest(Expr? expr, TOperator? oper, OperatorExpr<TOperator>? other)
 		{
-			var unit = new Unit(null, expression);
+			var unit = new Unit(null, expr);
 			var nextUnit = other?.Children?.Any() is true
-				? new Unit(oper, other?.Children?.FirstOrDefault()?.Expression)
+				? new Unit(oper, other?.Children?.FirstOrDefault()?.Expr)
 				: null;
 			var restChildren = other?.Children?.Skip(1);
 			return new(new[] { unit, nextUnit }.ConcatBefore(restChildren));
@@ -132,24 +150,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public override string? ToString()
 		{
 			var childStrs = Children?
-				.Select(ch => ch?.Oper switch
-				{
-					Operator.Comp.Eq => " = ",
-					Operator.Comp.Ne => " <> ",
-					Operator.Comp.Lt => " < ",
-					Operator.Comp.Le => " <= ",
-					Operator.Comp.Gt => " > ",
-					Operator.Comp.Ge => " >= ",
-					Operator.Arith.Add => " + ",
-					Operator.Arith.Subtract => " - ",
-					Operator.Arith.Multiply => " * ",
-					Operator.Arith.Divide => " / ",
-					Operator.Arith.Negative => "-",
-					Operator.Logical.And => " AND ",
-					Operator.Logical.Or => " OR ",
-					Operator.Logical.Not => "NOT ",
-					_ => default,
-				} + $"{ch?.Expression?.ToString(ToStringOptions.WithBrackets)}")
+				.Select(ch => $"{Operator.ToString(ch?.Oper)}{ch?.Expr?.ToString(ToStringOptions.WithBrackets)}")
 				?? Enumerable.Empty<string?>();
 			return ToString(string.Concat(childStrs));
 		}
