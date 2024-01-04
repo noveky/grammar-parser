@@ -5,14 +5,6 @@
 		public static bool IsIn(this object? obj, params object?[]? collection) => collection?.Contains(obj) is true;
 		public static T? As<T>(this object? obj) => (T?)obj;
 		public static IEnumerable<T?>? AsEnumerable<T>(this object? obj) => obj.As<IEnumerable<T?>?>();
-		public static string? AsString(this object? obj) => obj.As<string?>();
-		public static char? AsChar(this object? obj) => obj.As<char?>();
-		public static int? AsInt(this object? obj) => obj.As<int?>();
-		public static long? AsLong(this object? obj) => obj.As<long?>();
-		public static float? AsFloat(this object? obj) => obj.As<float?>();
-		public static double? AsDouble(this object? obj) => obj.As<double?>();
-		public static decimal? AsDecimal(this object? obj) => obj.As<decimal?>();
-		public static bool? AsBool(this object? obj) => obj.As<bool?>();
 		public static IEnumerable<T?> Array<T>(this T? obj) => new[] { obj };
 		public static IEnumerable<T?> Array<T>(this object? obj) => new[] { obj.As<T?>() };
 		public static IEnumerable<T?> ConcatBefore<T>(this IEnumerable<T?>? obj, IEnumerable<T?>? other) =>
