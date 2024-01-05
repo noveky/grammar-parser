@@ -1,6 +1,5 @@
 using SyntaxParser.Shared;
 using System.Diagnostics;
-using System.Runtime.ConstrainedExecution;
 using System.Text.RegularExpressions;
 
 namespace SyntaxParser

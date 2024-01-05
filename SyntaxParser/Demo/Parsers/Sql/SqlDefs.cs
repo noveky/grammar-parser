@@ -1,5 +1,4 @@
 ﻿using SyntaxParser.Shared;
-using System.Text.Json.Nodes;
 
 namespace SyntaxParser.Demo.Parsers.Sql
 {
