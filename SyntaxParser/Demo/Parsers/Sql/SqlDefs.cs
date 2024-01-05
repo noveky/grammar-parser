@@ -1,5 +1,4 @@
 ﻿using SyntaxParser.Shared;
-using System.Text.Json.Nodes;
 
 namespace SyntaxParser.Demo.Parsers.Sql
 {
@@ -140,7 +139,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public override string? ToString() => ToString($"{GetType().Name} {Subquery?.ToString(SelectStmt.ToStringType.Short)}");
 	}
 
-	public class OperatorExpr<TOperator> : Expr where TOperator: struct, Enum
+	public class OperatorExpr<TOperator> : Expr where TOperator : struct, Enum
 	{
 		public class Unit
 		{

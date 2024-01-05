@@ -1,5 +1,4 @@
 ﻿using SyntaxParser.Demo.Shared;
-using System.Runtime.CompilerServices;
 
 namespace SyntaxParser.Demo.UI.Pages
 {

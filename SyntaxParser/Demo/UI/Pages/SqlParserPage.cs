@@ -3,7 +3,7 @@ using SyntaxParser.Demo.Shared;
 
 namespace SyntaxParser.Demo.UI.Pages
 {
-    public class SqlParserPage : IPage
+	public class SqlParserPage : IPage
 	{
 		public string? Title { get; set; } = "SQL Parser";
 

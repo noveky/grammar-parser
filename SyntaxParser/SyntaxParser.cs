@@ -1,6 +1,5 @@
 using SyntaxParser.Shared;
 using System.Diagnostics;
-using System.Runtime.ConstrainedExecution;
 using System.Text.RegularExpressions;
 
 namespace SyntaxParser
@@ -41,7 +40,7 @@ namespace SyntaxParser
 		public bool IgnoreCase { get; set; } = false;
 		public string? SkipPattern { get; set; }
 		public TokenizationType TokenizationType { get; set; } = TokenizationType.Static;
-		public RegexOptions RegexOptions => IgnoreCase? RegexOptions.IgnoreCase : RegexOptions.None;
+		public RegexOptions RegexOptions => IgnoreCase ? RegexOptions.IgnoreCase : RegexOptions.None;
 
 		public Parser SetIgnoreCase(bool ignoreCase) { IgnoreCase = ignoreCase; return this; }
 		public Parser SetSkipPattern(string? skipPattern) { SkipPattern = skipPattern; return this; }
@@ -82,7 +81,7 @@ namespace SyntaxParser
 			{
 				stream = TokenizationType switch
 				{
-					TokenizationType.Static => new TokenStream(this, Tokenize(inputStream)),
+					TokenizationType.Static => new TokenStream(Tokenize(inputStream)),
 					TokenizationType.Dynamic => inputStream,
 					_ => throw new NotSupportedException(),
 				};
@@ -170,14 +169,12 @@ namespace SyntaxParser
 
 	public class TokenStream : IStream
 	{
-		readonly Parser parser;
 		readonly Token[] tokens;
 		public object this[int index] => tokens[index];
 		public object[] this[Range range] => tokens[range];
 		public int Index { get; set; } = 0;
-		public TokenStream(Parser parser, IEnumerable<Token> tokens)
+		public TokenStream(IEnumerable<Token> tokens)
 		{
-			this.parser = parser;
 			this.tokens = tokens.ToArray();
 		}
 

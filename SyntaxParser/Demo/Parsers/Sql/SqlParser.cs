@@ -224,7 +224,7 @@
 			binaryCompOper.NewSeqBranch(ge).SetBuilder(m => Operator.Comp.Ge);
 			binaryCompOper.NewSeqBranch(@in).SetBuilder(m => Operator.Comp.In);
 			binaryCompOper.NewSeqBranch(@notIn).SetBuilder(m => Operator.Comp.NotIn);
-			
+
 			unaryCompOper.NewSeqBranch(@exists).SetBuilder(m => Operator.Comp.Exists);
 
 			binaryArithOper.NewSeqBranch(plus).SetBuilder(m => Operator.Arith.Add);
