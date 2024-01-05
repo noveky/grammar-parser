@@ -1,6 +1,6 @@
 using SyntaxParser.Shared;
-using System;
 using System.Diagnostics;
+using System.Runtime.ConstrainedExecution;
 using System.Text.RegularExpressions;
 
 namespace SyntaxParser
@@ -10,7 +10,9 @@ namespace SyntaxParser
 		public static bool DebugMode { get; set; } = false;
 
 		public static void LogDebug(string? message, string? category = null) => Debug.WriteLineIf(DebugMode, message, category);
-		public static void LogDebug(InputStream stream, string? message, string? category = null) => LogDebug($"{$"@\"{stream.Current}\"",-8}{message}", category);
+		public static void LogDebug(IStream stream, string? message, string? category = null) => LogDebug($"{$"@\"{stream.Current}\"",-8}{message}", category);
+
+		class TokenizationFailedException : Exception { }
 
 		ISyntaxDef SyntaxDef
 		{
@@ -23,7 +25,8 @@ namespace SyntaxParser
 					node.Name.Value = name;
 					if (node is ITokenNode tokenNode)
 					{
-						tokenNode.TokenType.Regex = tokenNode.Regex;
+						tokenNode.TokenType.Regex ??= tokenNode.Regex;
+						TokenTypes.Add(tokenNode.TokenType);
 					}
 					if (node is IMultiNode multiNode)
 					{
@@ -33,26 +36,67 @@ namespace SyntaxParser
 				RootNode = value.RootNode;
 			}
 		}
+		public List<TokenType> TokenTypes { get; } = new();
 		public INode? RootNode { get; private set; }
 		public bool IgnoreCase { get; set; } = false;
 		public string? SkipPattern { get; set; }
+		public TokenizationType TokenizationType { get; set; } = TokenizationType.Static;
 		public RegexOptions RegexOptions => IgnoreCase? RegexOptions.IgnoreCase : RegexOptions.None;
 
-		public Parser SetIgnoreCase(bool ignoreCase = true) { IgnoreCase = ignoreCase; return this; }
+		public Parser SetIgnoreCase(bool ignoreCase) { IgnoreCase = ignoreCase; return this; }
 		public Parser SetSkipPattern(string? skipPattern) { SkipPattern = skipPattern; return this; }
 		public Parser SetSyntaxDef(ISyntaxDef syntaxDef) { SyntaxDef = syntaxDef; return this; }
-		
+		public Parser SetTokenizationType(TokenizationType tokenizeType) { TokenizationType = tokenizeType; return this; }
+
+		IEnumerable<Token> Tokenize(InputStream inputStream)
+		{
+			bool changeMade;
+			do
+			{
+				changeMade = false;
+				foreach (var type in TokenTypes)
+				{
+					var token = inputStream.NextToken(type);
+					if (token is null) continue;
+					LogDebug($"Got token `{token}`", "Lexer");
+					yield return token;
+					changeMade = true;
+					break;
+				}
+			} while (changeMade);
+
+			if (!inputStream.AtEnd)
+			{
+				throw new TokenizationFailedException();
+			}
+		}
+
 		public IEnumerable<object?> Parse(string str)
 		{
 			if (RootNode is null) throw new InvalidOperationException();
 
-			var stream = new InputStream(this, str);
+			InputStream inputStream = new(this, str);
+			IStream stream;
+			try
+			{
+				stream = TokenizationType switch
+				{
+					TokenizationType.Static => new TokenStream(this, Tokenize(inputStream)),
+					TokenizationType.Dynamic => inputStream,
+					_ => throw new NotSupportedException(),
+				};
+			}
+			catch (TokenizationFailedException)
+			{
+				yield break;
+			}
+
 			LogDebug("Start to parse input string", "Parser");
 			foreach (var result in RootNode.Parse(stream))
 			{
 				if (!stream.AtEnd)
 				{
-					LogDebug($"Discard result `{result}` for unparsed portion: \"{stream.Rest}\"", "Parser");
+					LogDebug($"Discard result `{result}` for unparsed portion (length: {stream[stream.Index..].Length})", "Parser");
 					continue;
 				}
 				LogDebug($"Accept result `{result}`", "Parser");
@@ -61,41 +105,57 @@ namespace SyntaxParser
 		}
 	}
 
-	public class InputStream
+	public enum TokenizationType { Static, Dynamic };
+
+	public interface IStream
 	{
+		public object this[int index] { get; }
+		public object[] this[Range range] { get; }
+		public int Index { get; set; }
+		public bool AtBegin { get; }
+		public bool AtEnd { get; }
+		public object? Current { get; }
+		public Token? NextToken(TokenType? type);
+	}
+
+	public class InputStream : IStream
+	{
+		readonly Parser parser;
 		readonly string str;
-		public Parser Parser { get; }
-		public char this[int index] => str[index];
-		public string this[Range range] => str[range];
+		public object this[int index] => str[index];
+		public object[] this[Range range] => str[range].Cast<object>().ToArray();
 		public int Index { get; set; } = 0;
 		public InputStream(Parser parser, string str)
 		{
-			Parser = parser;
+			this.parser = parser;
 			this.str = str;
 		}
+
 		public bool AtBegin => Index <= 0 &&
 			(Index == 0 ? true : throw new IndexOutOfRangeException());
 		public bool AtEnd => Index >= str.Length &&
 			(Index == str.Length ? true : throw new IndexOutOfRangeException());
-		public char? Current => AtEnd ? null : str[Index];
-		public string Rest => AtEnd ? string.Empty : this[Index..];
+		public char? Cur => AtEnd ? null : str[Index];
+		public object? Current => Cur;
+		public string Rest => AtEnd ? string.Empty : str[Index..];
+
 		public Token? NextToken(TokenType? type)
 		{
 			if (type is null || AtEnd) return null;
 
-			if (Parser.SkipPattern is not null)
+			if (parser.SkipPattern is not null)
 			{
-				Index += Regex.Match(Rest, $"^{Parser.SkipPattern}", Parser.RegexOptions).Length;
+				Index += Regex.Match(Rest, $"^{parser.SkipPattern}", parser.RegexOptions).Length;
 			}
 
-			var match = Regex.Match(Rest, $"^{type.Regex ?? throw new InvalidOperationException()}", Parser.RegexOptions);
+			var match = Regex.Match(Rest, $"^{type.Regex ?? throw new InvalidOperationException()}", parser.RegexOptions);
 			if (!match.Success)
 			{
 				return null;
 			}
 			foreach (var coverType in type.CoverTypes)
 			{
-				if (Regex.IsMatch(match.Value, $"{coverType.Regex ?? throw new InvalidOperationException()}", Parser.RegexOptions))
+				if (Regex.IsMatch(match.Value, $"{coverType.Regex ?? throw new InvalidOperationException()}", parser.RegexOptions))
 				{
 					return null;
 				}
@@ -104,6 +164,43 @@ namespace SyntaxParser
 			Index += match.Length;
 
 			return new Token(type, match.Value);
+		}
+	}
+
+	public class TokenStream : IStream
+	{
+		readonly Parser parser;
+		readonly Token[] tokens;
+		public object this[int index] => tokens[index];
+		public object[] this[Range range] => tokens[range];
+		public int Index { get; set; } = 0;
+		public TokenStream(Parser parser, IEnumerable<Token> tokens)
+		{
+			this.parser = parser;
+			this.tokens = tokens.ToArray();
+		}
+
+		public bool AtBegin => Index <= 0 &&
+			(Index == 0 ? true : throw new IndexOutOfRangeException());
+		public bool AtEnd => Index >= tokens.Length &&
+			(Index == tokens.Length ? true : throw new IndexOutOfRangeException());
+		public Token? Cur => AtEnd ? null : tokens[Index];
+		public object? Current => Cur;
+		public Token[] Rest => AtEnd ? Array.Empty<Token>() : tokens[Index..];
+
+		public Token? NextToken(TokenType? type)
+		{
+			if (type is null || AtEnd) return null;
+
+			var token = tokens[Index];
+			if (token.Type != type)
+			{
+				return null;
+			}
+
+			++Index;
+
+			return token;
 		}
 	}
 
@@ -181,7 +278,7 @@ namespace SyntaxParser
 
 	public interface INode : INameable
 	{
-		public IEnumerable<object?> Parse(InputStream stream);
+		public IEnumerable<object?> Parse(IStream stream);
 	}
 	public interface INode<T> : INode { }
 
@@ -226,7 +323,7 @@ namespace SyntaxParser
 
 		public EmptyNode SetName(string? name) { Name.Value = name; return this; }
 
-		public IEnumerable<object?> Parse(InputStream stream)
+		public IEnumerable<object?> Parse(IStream stream)
 		{
 			Parser.LogDebug(stream, $"`{this}.Parse` yields `{null}`");
 			yield return null;
@@ -247,10 +344,11 @@ namespace SyntaxParser
 
 		public TokenNode<T> SetName(string? name) { Name.Value = name; return this; }
 		public TokenNode<T> SetRegex(string regex) { Regex = regex; return this; }
+		public TokenNode<T> SetTokenType(TokenType tokenType) { TokenType = tokenType; return this; }
 		public TokenNode<T> SetBuilder(BuilderFunc builder) { Builder = builder; return this; }
 		public TokenNode<T> SetCoverTypes(params ITokenNode[] nodes) { TokenType.CoverTypes = nodes.Select(node => node.TokenType).ToList(); return this; }
 
-		public IEnumerable<object?> Parse(InputStream stream)
+		public IEnumerable<object?> Parse(IStream stream)
 		{
 			var token = stream.NextToken(TokenType);
 			if (token is null)
@@ -279,7 +377,7 @@ namespace SyntaxParser
 		public SeqNode<T> SetChildren(params INode[] children) { Children = children.ToList(); return this; }
 		public SeqNode<T> SetBuilder(BuilderFunc builder) { Builder = builder; return this; }
 
-		IEnumerable<IEnumerable<object?>> ParseRecursive(InputStream stream, int childIndex)
+		IEnumerable<IEnumerable<object?>> ParseRecursive(IStream stream, int childIndex)
 		{
 			if (childIndex >= Children.Count) yield break;
 
@@ -306,7 +404,7 @@ namespace SyntaxParser
 				}
 			}
 		}
-		public IEnumerable<object?> Parse(InputStream stream)
+		public IEnumerable<object?> Parse(IStream stream)
 		{
 			foreach (var childrenResults in ParseRecursive(stream, 0))
 			{
@@ -327,7 +425,7 @@ namespace SyntaxParser
 		public List<INode> Branches { get; set; } = new();
 		public MultiNode() => Name = new(GetType());
 
-		public virtual IEnumerable<object?> Parse(InputStream stream)
+		public virtual IEnumerable<object?> Parse(IStream stream)
 		{
 			var checkpoint = stream.Index;
 			foreach (var br in Branches)
@@ -358,7 +456,7 @@ namespace SyntaxParser
 		public MultiNode<T> AddBranches(params INode<T>[] branches) { Branches.AddRange(branches); return this; }
 		public MultiNode<T> AddBranch(INode<T> branch) => AddBranches(branch.Array());
 
-		public override IEnumerable<object?> Parse(InputStream stream)
+		public override IEnumerable<object?> Parse(IStream stream)
 		{
 			foreach (var baseResult in base.Parse(stream))
 			{
@@ -379,7 +477,7 @@ namespace SyntaxParser
 		public ConvertNode<T> AddBranch(INode<T> branch) => AddBranches(branch.Array());
 		public ConvertNode<T> SetBuilder(BuilderFunc builder) { Builder = builder; return this; }
 
-		public override IEnumerable<object?> Parse(InputStream stream)
+		public override IEnumerable<object?> Parse(IStream stream)
 		{
 			foreach (var baseResult in base.Parse(stream))
 			{
