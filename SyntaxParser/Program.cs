@@ -8,6 +8,8 @@ namespace SyntaxParser
 	{
 		static void Main(string[] args)
 		{
+			Parser.DebugMode = true;
+
 			SyntaxParserDemo.Run();
 		}
 	}

@@ -1,4 +1,5 @@
 using SyntaxParser.Shared;
+using System;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
@@ -6,36 +7,55 @@ namespace SyntaxParser
 {
 	public class Parser
 	{
-		public static bool LogDebug { get; set; } = false;
+		public static bool DebugMode { get; set; } = false;
 
-		public ISyntaxNode? RootSyntaxNode { get; set; }
+		public static void LogDebug(string? message, string? category = null) => Debug.WriteLineIf(DebugMode, message, category);
+		public static void LogDebug(InputStream stream, string? message, string? category = null) => LogDebug($"{$"@\"{stream.Current}\"",-8}{message}", category);
+
+		ISyntaxDef SyntaxDef
+		{
+			set
+			{
+				foreach (var kvp in value.ToExpando())
+				{
+					var name = kvp.Key;
+					if (kvp.Value is not INode node) continue;
+					node.Name.Value = name;
+					if (node is ITokenNode tokenNode)
+					{
+						tokenNode.TokenType.Regex = tokenNode.Regex;
+					}
+					if (node is IMultiNode multiNode)
+					{
+						_ = multiNode.Branches.Select(multiNode.RenameBranch).ToArray();
+					}
+				}
+				RootNode = value.RootNode;
+			}
+		}
+		public INode? RootNode { get; private set; }
 		public bool IgnoreCase { get; set; } = false;
 		public string? SkipPattern { get; set; }
-
 		public RegexOptions RegexOptions => IgnoreCase? RegexOptions.IgnoreCase : RegexOptions.None;
 
-		public static TokenNode<T> NewToken<T>(string? name, string regex, Func<Token, object?>? builder = null)
-		{
-			TokenType tokenType = new(name, regex);
-			return new TokenNode<T>(name, tokenType, builder);
-		}
-		public static ITokenNode NewToken(string? name, string regex, Func<Token, object?>? builder = null) =>
-			NewToken<object?>(name, regex, builder);
-
+		public Parser SetIgnoreCase(bool ignoreCase = true) { IgnoreCase = ignoreCase; return this; }
+		public Parser SetSkipPattern(string? skipPattern) { SkipPattern = skipPattern; return this; }
+		public Parser SetSyntaxDef(ISyntaxDef syntaxDef) { SyntaxDef = syntaxDef; return this; }
+		
 		public IEnumerable<object?> Parse(string str)
 		{
-			if (RootSyntaxNode is null) throw new InvalidOperationException();
+			if (RootNode is null) throw new InvalidOperationException();
 
 			var stream = new InputStream(this, str);
-			Debug.WriteLineIf(LogDebug, "Start to parse input string", "Parser");
-			foreach (var result in RootSyntaxNode.Parse(stream))
+			LogDebug("Start to parse input string", "Parser");
+			foreach (var result in RootNode.Parse(stream))
 			{
 				if (!stream.AtEnd)
 				{
-					Debug.WriteLineIf(LogDebug, $"Discard result `{result}` for unparsed portion: \"{stream.Rest}\"", "Parser");
+					LogDebug($"Discard result `{result}` for unparsed portion: \"{stream.Rest}\"", "Parser");
 					continue;
 				}
-				Debug.WriteLineIf(LogDebug, $"Accept result `{result}`", "Parser");
+				LogDebug($"Accept result `{result}`", "Parser");
 				yield return result;
 			}
 		}
@@ -68,14 +88,14 @@ namespace SyntaxParser
 				Index += Regex.Match(Rest, $"^{Parser.SkipPattern}", Parser.RegexOptions).Length;
 			}
 
-			var match = Regex.Match(Rest, $"^{type.RegexPattern}", Parser.RegexOptions);
+			var match = Regex.Match(Rest, $"^{type.Regex ?? throw new InvalidOperationException()}", Parser.RegexOptions);
 			if (!match.Success)
 			{
 				return null;
 			}
 			foreach (var coverType in type.CoverTypes)
 			{
-				if (Regex.IsMatch(match.Value, coverType.RegexPattern, Parser.RegexOptions))
+				if (Regex.IsMatch(match.Value, $"{coverType.Regex ?? throw new InvalidOperationException()}", Parser.RegexOptions))
 				{
 					return null;
 				}
@@ -91,36 +111,32 @@ namespace SyntaxParser
 	{
 		readonly Type? type;
 		public string? Value { get; set; }
-		public override string? ToString() => Value ?? type?.Name;
-		public Name(Type type, string? name = null)
+		public Name(Type type, string? value = null)
 		{
 			this.type = type;
-			Value = name;
+			Value = value;
 		}
+
+		public override string? ToString() => Value ?? type?.Name;
 	}
 
 	public interface INameable
 	{
-		public Name Name { get; set; }
+		public Name Name { get; }
 	}
 
 	public class TokenType : INameable
 	{
-		public List<TokenType> CoverTypes { get; } = new();
-		public Name Name { get; set; }
-		public override string? ToString() => $"{Name}(\"{RegexPattern}\")";
-		public string RegexPattern { get; }
-		public TokenType(string? name, string regex)
-		{
-			Name = new(GetType(), name);
-			RegexPattern = regex;
-		}
-		public void CoverBy(IEnumerable<TokenType> types) => CoverTypes.AddRange(types);
+		public List<TokenType> CoverTypes { get; set; } = new();
+		public Name Name { get; }
+		public string? Regex { get; set; }
+		public TokenType() => Name = new(GetType());
+
+		public override string? ToString() => $"{Name}(\"{Regex}\")";
 	}
 
 	public class Token
 	{
-		public override string? ToString() => $"{Type.Name}(\"{Value}\")";
 		public TokenType Type { get; set; }
 		public string Value { get; set; }
 		public Token(TokenType type, string value)
@@ -128,156 +144,154 @@ namespace SyntaxParser
 			Type = type;
 			Value = value;
 		}
+
+		public override string? ToString() => $"{Type.Name}(\"{Value}\")";
+	}
+
+	public interface ISyntaxDef
+	{
+		public INode RootNode { get; }
 	}
 
 	public static class Syntax
 	{
-		public static EmptyNode Empty(string? name = "ε") => new(name);
-
-		public static SequenceNode<T> Seq<T>(string? name = null, params ISyntaxNode[] children) =>
-			new(name, children);
-		public static SequenceNode<T> Seq<T>(params ISyntaxNode[] children) => Seq<T>(null, children);
-
-		public static MultipleNode<T> Multi<T>(string? name = null, params ISyntaxNode[] branches) =>
-			new(name, branches);
-		public static MultipleNode<T> Multi<T>(params ISyntaxNode[] branches) => Multi<T>(null, branches);
+		public static EmptyNode Empty() => new();
+		public static SeqNode<T> Sequence<T>(params INode[] children) => new SeqNode<T>().SetChildren(children);
+		public static MultiNode<T> Multiple<T>(params INode<T>[] branches) => new MultiNode<T>().AddBranches(branches);
+		public static ConvertNode<T> Converter<T>(params INode[] branches) => new ConvertNode<T>().AddBranches(branches);
 
 		public static class Sugar
 		{
-			public static ISyntaxNode<IEnumerable<T>> List<T>(string? name, ISyntaxNode<T> element, ISyntaxNode? separator = null)
+			public static INode<IEnumerable<T>> List<T>(INode<T> element, INode? separator = null)
 			{
-				var restElements = Multi<IEnumerable<T>>();
-				{
-					_ = restElements.AddBranch(Empty());
-				}
-				{
-					var __ = restElements.AddBranch(separator is null ? Seq<IEnumerable<T>>(element, restElements) : Seq<IEnumerable<T>>(separator, element, restElements));
-					__.Builder = a => a.At(element).PrependTo(a.At(restElements));
-				}
+				var restElements = Multiple<IEnumerable<T>?>();
+				restElements.NewSeqBranch(Empty()).SetBuilder(a => null);
+				restElements.NewSeqBranch(separator is null
+					? new INode[] { element, restElements }
+					: new INode[] { separator, element, restElements })
+					.SetBuilder(a => a.At(element).PrependTo(a.At(restElements)));
 
-				var elements = Multi<IEnumerable<T>>(name);
-				{
-					var __ = elements.NewSeqBranch(element, restElements);
-					__.Builder = a => a.At(element).PrependTo(a.At(restElements));
-				}
+				var elements = Sequence<IEnumerable<T>>(element, restElements)
+					.SetBuilder(a => a.At(element).PrependTo(a.At(restElements)));
 
 				return elements;
 			}
-
-			public static ISyntaxNode<IEnumerable<T>> ListOf<T>(ISyntaxNode<T> element, ISyntaxNode? separator = null) => List(null, element, separator);
 		}
 	}
 
-	public interface ISyntaxNode : INameable
+	public interface INode : INameable
 	{
 		public IEnumerable<object?> Parse(InputStream stream);
 	}
-	public interface ISyntaxNode<T> : ISyntaxNode { }
+	public interface INode<T> : INode { }
 
-	public class EmptyNode : ISyntaxNode<object?>
+	public interface ITokenNode : INode
 	{
-		public Name Name { get; set; }
-		public override string? ToString() => $"{Name}";
-		public Func<object?>? Builder { get; set; }
-		public EmptyNode(string? name = null, Func<object?>? builder = null)
-		{
-			Name = new(GetType(), name);
-			Builder = builder;
-		}
-		public EmptyNode() : this(null) { }
-
-		public IEnumerable<object?> Parse(InputStream stream)
-		{
-			Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields `{null}`");
-			yield return null;
-		}
-	}
-
-	public interface ITokenNode : ISyntaxNode
-	{
+		public string? Regex { get; set; }
 		public TokenType TokenType { get; set; }
-		public Func<Token, object?>? Builder { get; set; }
-
-		public void CoverBy(params ITokenNode[] nodes);
-	}
-	public class TokenNode<T> : ITokenNode, ISyntaxNode<T>
-	{
-		public Name Name { get; set; }
-		public override string? ToString() => $"{Name}";
-		public TokenType TokenType { get; set; }
-		public Func<Token, object?>? Builder { get; set; }
-		public TokenNode(string? name, TokenType tokenType, Func<Token, object?>? builder = null)
-		{
-			Name = new(GetType(), name);
-			TokenType = tokenType;
-			Builder = builder;
-		}
-		public TokenNode(TokenType tokenType, Func<Token, object?>? builder = null) : this(null, tokenType, builder) { }
-
-		public void CoverBy(params ITokenNode[] nodes) => TokenType.CoverBy(nodes.Select(node => node.TokenType));
-
-		public IEnumerable<object?> Parse(InputStream stream)
-		{
-			var token = stream.NextToken(TokenType);
-			if (token is null)
-			{
-				Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields nothing");
-				yield break;
-			}
-			var result = Builder?.Invoke(token);
-			Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields `{result}`");
-			yield return result;
-		}
 	}
 
-	public interface ISequenceNode : ISyntaxNode
+	public interface ISeqNode : INode
 	{
 		public class Results
 		{
-			readonly ISequenceNode seqNode;
+			readonly ISeqNode seqNode;
 			readonly object?[] objects;
-			public Results(ISequenceNode seqNode, object?[] objects)
+			public Results(ISeqNode seqNode, object?[] objects)
 			{
 				this.seqNode = seqNode;
 				this.objects = objects;
 			}
 
 			public object? this[int index] => objects[index];
-			public TNode? At<TNode>(ISyntaxNode<TNode> node, int order = 1) =>
-				objects[seqNode.Children.Select((n, i) => new { n, i }).Where(x => x.n == node).ElementAt(order - 1).i].As<TNode>();
+			public TNode At<TNode>(INode<TNode> node, int order = 0) =>
+				objects[seqNode.Children.Select((n, i) => new { n, i }).Where(x => x.n == node).ElementAt(order).i].As<TNode>();
 		}
 
-		public List<ISyntaxNode> Children { get; set; }
-		public Func<Results, object?>? Builder { get; set; }
-
-		public void SetChildren(params ISyntaxNode[] children);
+		public List<INode> Children { get; set; }
 	}
-	public class SequenceNode<T> : ISequenceNode, ISyntaxNode<T>
+
+	public interface IMultiNode : INode
 	{
+		public List<INode> Branches { get; set; }
 
-		public Name Name { get; set; }
-		public override string? ToString() => $"{Name}({string.Join(", ", Children.Select(ch => ch.Name))})";
-		public List<ISyntaxNode> Children { get; set; } = new();
-		public Func<ISequenceNode.Results, object?>? Builder { get; set; }
-		public SequenceNode(string? name = null) => Name = new(GetType(), name);
-		public SequenceNode(string? name = null, params ISyntaxNode[] branches) : this(name) => SetChildren(branches);
-		public SequenceNode() : this(null) { }
+		public string? RenameBranch(INode branch, int index) =>
+			branch.Name.Value ??= $"{Name}_{index}";
+	}
 
-		public void SetChildren(params ISyntaxNode[] children) => Children = children.ToList();
+	public class EmptyNode : INode<object?>
+	{
+		public Name Name { get; }
+		public EmptyNode() => Name = new(GetType(), "ε");
 
-		IEnumerable<IEnumerable<object?>> ParseRecursive(InputStream stream, int childIndex)
+		public EmptyNode SetName(string? name) { Name.Value = name; return this; }
+
+		public IEnumerable<object?> Parse(InputStream stream)
+		{
+			Parser.LogDebug(stream, $"`{this}.Parse` yields `{null}`");
+			yield return null;
+		}
+
+		public override string? ToString() => $"{Name}";
+	}
+
+	public class TokenNode<T> : ITokenNode, INode<T>
+	{
+		public delegate T BuilderFunc(Token t);
+
+		public Name Name { get; }
+		public string? Regex { get; set; }
+		public TokenType TokenType { get; set; } = new();
+		public BuilderFunc? Builder { get; set; }
+		public TokenNode() => Name = TokenType.Name;
+
+		public TokenNode<T> SetName(string? name) { Name.Value = name; return this; }
+		public TokenNode<T> SetRegex(string regex) { Regex = regex; return this; }
+		public TokenNode<T> SetBuilder(BuilderFunc builder) { Builder = builder; return this; }
+		public TokenNode<T> SetCoverTypes(params ITokenNode[] nodes) { TokenType.CoverTypes = nodes.Select(node => node.TokenType).ToList(); return this; }
+
+		public IEnumerable<object?> Parse(InputStream stream)
+		{
+			var token = stream.NextToken(TokenType);
+			if (token is null)
+			{
+				Parser.LogDebug(stream, $"`{this}.Parse` yields nothing");
+				yield break;
+			}
+			object? result = Builder is null ? token.Value : Builder.Invoke(token);
+			Parser.LogDebug(stream, $"`{this}.Parse` yields `{result}`");
+			yield return result;
+		}
+
+		public override string? ToString() => $"{Name}";
+	}
+
+	public class SeqNode<T> : ISeqNode, INode<T>
+	{
+		public delegate T BuilderFunc(ISeqNode.Results a);
+
+		public Name Name { get; }
+		public List<INode> Children { get; set; } = new();
+		public BuilderFunc? Builder { get; set; }
+		public SeqNode() => Name = new(GetType());
+
+		public SeqNode<T> SetName(string? name) { Name.Value = name; return this; }
+		public SeqNode<T> SetChildren(params INode[] children) { Children = children.ToList(); return this; }
+		public SeqNode<T> SetBuilder(BuilderFunc builder) { Builder = builder; return this; }
+
+		IEnumerable <IEnumerable<object?>> ParseRecursive(InputStream stream, int childIndex)
 		{
 			if (childIndex >= Children.Count) yield break;
 
 			var ch = Children[childIndex];
-			Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.ParseRecursive` calls `{ch}.Parse` at child {childIndex} `{Children[childIndex]}`");
+			Parser.LogDebug(stream, $"`{this}.ParseRecursive` calls `{ch}.Parse` at child {childIndex} `{Children[childIndex]}`");
 			foreach (var chResult in ch.Parse(stream))
 			{
 				int checkpoint = stream.Index;
 				var chResultAsArray = new[] { chResult };
 				if (childIndex == Children.Count - 1)
 				{
-					Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
+					Parser.LogDebug(stream, $"`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
 					yield return chResultAsArray;
 				}
 				else
@@ -285,7 +299,7 @@ namespace SyntaxParser
 					stream.Index = checkpoint;
 					foreach (var restResults in ParseRecursive(stream, childIndex + 1))
 					{
-						Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
+						Parser.LogDebug(stream, $"`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
 						yield return chResultAsArray.Concat(restResults);
 					}
 				}
@@ -295,66 +309,83 @@ namespace SyntaxParser
 		{
 			foreach (var childrenResults in ParseRecursive(stream, 0))
 			{
-				Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields `{childrenResults}`");
-				yield return Builder?.Invoke(new ISequenceNode.Results(this, childrenResults.ToArray()));
+				if (Builder is null) throw new InvalidOperationException();
+
+				Parser.LogDebug(stream, $"`{this}.Parse` yields `{childrenResults}`");
+				yield return Builder.Invoke(new ISeqNode.Results(this, childrenResults.ToArray()));
 			}
 		}
+
+		public override string? ToString() => $"{Name}({string.Join(", ", Children.Select(ch => ch.Name))})";
 	}
-	
-	public interface IMultipleNode : ISyntaxNode
+
+	public abstract class MultiNode : IMultiNode
 	{
-		public List<ISyntaxNode> Branches { get; set; }
-		public Func<object?, object?>? Converter { get; set; }
+		public Name Name { get; }
+		public List<INode> Branches { get; set; } = new();
+		public MultiNode() => Name = new(GetType());
 
-		public TBranch AddBranch<TBranch>(TBranch branch) where TBranch : ISyntaxNode;
-		public IMultipleNode NewMultiBranch(string? name = null, params ISyntaxNode[] branches);
-		public IMultipleNode NewMultiBranch(params ISyntaxNode[] branches);
-		public ISequenceNode NewSeqBranch(string? name = null, params ISyntaxNode[] children);
-		public ISequenceNode NewSeqBranch(params ISyntaxNode[] children);
-		public void SetBranches(params ISyntaxNode[] branches);
-	}
-	public class MultipleNode<T> : IMultipleNode, ISyntaxNode<T>
-	{
-		public Name Name { get; set; }
-		public override string? ToString() => $"{Name}[{string.Join(" | ", Branches.Select(br => br.Name))}]";
-		public List<ISyntaxNode> Branches { get; set; } = new();
-		public Func<object?, object?>? Converter { get; set; } = null;
-		public MultipleNode(string? name = null) => Name = new(GetType(), name);
-		public MultipleNode(string? name = null, params ISyntaxNode[] branches) : this(name) => SetBranches(branches);
-		public MultipleNode() : this(null) { }
-
-		string? RenameBranch(ISyntaxNode branch, int index) =>
-			branch.Name.Value ??= $"{Name}_{branch.Name.Value ?? index.ToString()}";
-		public TBranch AddBranch<TBranch>(TBranch branch) where TBranch : ISyntaxNode
-		{
-			RenameBranch(branch, Branches.Count);
-			Branches.Add(branch);
-			return branch;
-		}
-		public IMultipleNode NewMultiBranch(string? name = null, params ISyntaxNode[] branches) =>
-			AddBranch(new MultipleNode<object?>(name, branches));
-		public IMultipleNode NewMultiBranch(params ISyntaxNode[] branches) => NewMultiBranch(null, branches);
-		public ISequenceNode NewSeqBranch(string? name = null, params ISyntaxNode[] children) =>
-			AddBranch(new SequenceNode<object?>(name, children));
-		public ISequenceNode NewSeqBranch(params ISyntaxNode[] children) => NewSeqBranch(null, children);
-		public void SetBranches(params ISyntaxNode[] branches)
-		{
-			Branches = branches.ToList();
-			_ = Branches.Select(RenameBranch);
-		}
-
-		public IEnumerable<object?> Parse(InputStream stream)
+		public virtual IEnumerable<object?> Parse(InputStream stream)
 		{
 			var checkpoint = stream.Index;
 			foreach (var br in Branches)
 			{
 				stream.Index = checkpoint;
-				Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` calls `{br}.Parse`");
+				Parser.LogDebug(stream, $"`{this}.Parse` calls `{br}.Parse`");
 				foreach (var result in br.Parse(stream))
 				{
-					Debug.WriteLineIf(Parser.LogDebug, $"{$"@\"{stream.Current}\"",-8}`{this}.Parse` yields `{result}`");
-					yield return Converter is null ? result : Converter.Invoke(result);
+					Parser.LogDebug(stream, $"`{this}.Parse` yields `{result}`");
+					yield return result;
 				}
+			}
+		}
+
+		public override string? ToString() => $"{Name}[{string.Join(" | ", Branches.Select(br => br.Name))}]";
+	}
+
+	public class MultiNode<T> : MultiNode, INode<T>
+	{
+		public SeqNode<T> NewSeqBranch(params INode[] children)
+		{
+			var branch = new SeqNode<T>().SetChildren(children);
+			Branches.Add(branch);
+			return branch;
+		}
+
+		public MultiNode<T> SetName(string? name) { Name.Value = name; return this; }
+		public MultiNode<T> AddBranches(params INode<T>[] branches) { Branches.AddRange(branches); return this; }
+		public MultiNode<T> AddBranch(INode<T> branch) => AddBranches(branch.Array());
+
+		public override IEnumerable<object?> Parse(InputStream stream)
+		{
+			foreach (var baseResult in base.Parse(stream))
+			{
+				Parser.LogDebug(stream, $"`{this}.Parse` yields `{baseResult}`");
+				yield return baseResult;
+			}
+		}
+	}
+
+	public class ConvertNode<T> : MultiNode, INode<T>
+	{
+		public delegate T ConverterFunc(object? o);
+
+		public ConverterFunc? Converter { get; set; } = null;
+
+		public ConvertNode<T> SetName(string? name) { Name.Value = name; return this; }
+		public ConvertNode<T> AddBranches(params INode[] branches) { Branches.AddRange(branches); return this; }
+		public ConvertNode<T> AddBranch(INode<T> branch) => AddBranches(branch.Array());
+		public ConvertNode<T> SetConverter(ConverterFunc converter) { Converter = converter; return this; }
+
+		public override IEnumerable<object?> Parse(InputStream stream)
+		{
+			foreach (var baseResult in base.Parse(stream))
+			{
+				if (Converter is null) throw new InvalidOperationException();
+
+				var result = Converter.Invoke(baseResult).As<T>();
+				Parser.LogDebug(stream, $"`{this}.Parse` yields `{result}`");
+				yield return result;
 			}
 		}
 	}

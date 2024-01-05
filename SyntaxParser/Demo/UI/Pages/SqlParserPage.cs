@@ -21,14 +21,14 @@ namespace SyntaxParser.Demo.UI.Pages
 					var resultIter = sqlParser.Parse(sql).GetEnumerator();
 					if (!resultIter.MoveNext())
 					{
-						IO.LogError("Error", "Filter condition syntax error");
+						IO.LogError("Error", "Syntax error");
 						continue;
 					}
 					IO.PrintLn("Parsed result:", ConsoleColor.DarkGray);
 					IO.PrintLn(resultIter.Current);
 					if (resultIter.MoveNext())
 					{
-						IO.LogWarning("Warning", "Ambiguous syntax");
+						IO.LogWarning("Warning", "Ambiguous statement");
 						IO.PrintLn("Other possible results:", ConsoleColor.DarkGray);
 						do
 						{

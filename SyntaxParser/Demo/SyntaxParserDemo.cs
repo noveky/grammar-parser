@@ -8,7 +8,6 @@ namespace SyntaxParser.Demo
 		public static void Run()
 		{
 			Context.AppName = "Syntax Parser Demo";
-			Parser.LogDebug = true;
 
 			Page.Show<SqlParserPage>();
 		}
