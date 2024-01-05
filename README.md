@@ -4,7 +4,7 @@ C# 通用语法解析引擎。
 
 ### 全局选项
 
-- `Parser.DebugMode = true`：是否开启调试输出。
+- `Parser.DebugMode`：是否开启调试输出。
 
 ### 使用示例
 
