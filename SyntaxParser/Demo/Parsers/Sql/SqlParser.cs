@@ -73,7 +73,7 @@
 		public MultiNode<Relation> relation = new();
 		public MultiNode<IEnumerable<Relation>> relations = new();
 		public MultiNode<IEnumerable<Relation>?> fromClause = new();
-		public MultiNode<SelectSqlNode> selectStmt = new();
+		public MultiNode<SelectStmt> selectStmt = new();
 		public MultiNode<object> root = new();
 
 		public SqlSyntaxDef()
@@ -118,128 +118,125 @@
 
 			// Root
 
-			root.NewSeqBranch(Syntax.Converter<object>(selectStmt));
+			root.AddBranch(Syntax.Converter<object>(selectStmt));
 
 			// Statements
 
 			selectStmt.NewSeqBranch(@select, selectColumns, fromClause, whereClause)
-				.SetBuilder(s => new SelectSqlNode()
+				.SetBuilder(m => new SelectStmt()
 				{
-					Columns = s.At(selectColumns),
-					Tables = s.At(fromClause),
-					Condition = s.At(whereClause),
+					Columns = m.At(selectColumns),
+					Tables = m.At(fromClause),
+					Condition = m.At(whereClause),
 				});
 
 			// Components
 
-			fromClause.NewSeqBranch(empty);
-			fromClause.NewSeqBranch(@from, relations).SetBuilder(s => s.At(relations));
+			fromClause.NewSeqBranch(empty).SetBuilder(m => null);
+			fromClause.NewSeqBranch(@from, relations).SetBuilder(m => m.At(relations));
 
-			whereClause.NewSeqBranch(empty);
-			whereClause.NewSeqBranch(@where, expr).SetBuilder(s => s.At(expr));
+			whereClause.NewSeqBranch(empty).SetBuilder(m => null);
+			whereClause.NewSeqBranch(@where, expr).SetBuilder(m => m.At(expr));
 
-			selectColumns.NewSeqBranch(Syntax.Sugar.List(selectColumn, comma));
+			selectColumns.AddBranch(Syntax.Sugar.List(selectColumn, comma));
 
 			selectColumn.NewSeqBranch(expr, asAlias)
-				.SetBuilder(s =>
+				.SetBuilder(m =>
 				{
-					var _expr = s.At(expr);
-					_expr.Alias = s.At(asAlias);
+					var _expr = m.At(expr);
+					_expr.Alias = m.At(asAlias);
 					return _expr;
 				});
 
-			relations.NewSeqBranch(Syntax.Sugar.List(relation, comma));
+			relations.AddBranch(Syntax.Sugar.List(relation, comma));
 
 			relation.NewSeqBranch(id, asAlias)
-				.SetBuilder(s => new Relation()
+				.SetBuilder(m => new Relation()
 				{
-					Name = s.At(id),
-					Alias = s.At(asAlias),
+					Name = m.At(id),
+					Alias = m.At(asAlias),
 				});
 
-			asAlias.NewSeqBranch(empty);
-			asAlias.NewSeqBranch(id!);
-			asAlias.NewSeqBranch(@as, id).SetBuilder(s => s.At(id));
+			asAlias.NewSeqBranch(empty).SetBuilder(m => null);
+			asAlias.AddBranch(id!);
+			asAlias.NewSeqBranch(@as, id).SetBuilder(m => m.At(id));
 
-			value.NewSeqBranch(Syntax.Converter<Value>(udecimal, @uint, @true, @false, @null)
-				.SetBuilder(o => new Value(o)));
+			value.AddBranch(
+				Syntax.Converter<Value>(udecimal, @uint, @true, @false, @null)
+					.SetBuilder(o => new Value(o)));
 
-			fieldName.NewSeqBranch(star);
-			fieldName.NewSeqBranch(id);
+			fieldName.AddBranch(star);
+			fieldName.AddBranch(id);
 
 			attr.NewSeqBranch(fieldName)
-				.SetBuilder(s => new Attr()
+				.SetBuilder(m => new Attr()
 				{
-					FieldName = s.At(fieldName),
+					FieldName = m.At(fieldName),
 				});
 			attr.NewSeqBranch(id, dot, fieldName)
-				.SetBuilder(s => new Attr()
+				.SetBuilder(m => new Attr()
 				{
-					RelationName = s.At(id),
-					FieldName = s.At(fieldName),
+					RelationName = m.At(id),
+					FieldName = m.At(fieldName),
 				});
 
 			// Expressions
 
-			expr.NewSeqBranch(expr0);
+			expr.AddBranch(expr0);
 			expr.NewSeqBranch(expr0, binaryLogicalOper, expr)
-				.SetBuilder(s => s.At(expr) is OperatorExpr<Operator.Logical> other && !other.IsUnary
-				? OperatorExpr<Operator.Logical>.JoinRest(s.At(expr0), s.At(binaryLogicalOper), other)
-				: OperatorExpr<Operator.Logical>.Binary(s.At(expr0), s.At(binaryLogicalOper), s.At(expr)));
+				.SetBuilder(m => m.At(expr) is OperatorExpr<Operator.Logical> other && !other.IsUnary
+				? OperatorExpr<Operator.Logical>.JoinRest(m.At(expr0), m.At(binaryLogicalOper), other)
+				: OperatorExpr<Operator.Logical>.Binary(m.At(expr0), m.At(binaryLogicalOper), m.At(expr)));
 
-			expr0.NewSeqBranch(expr1);
+			expr0.AddBranch(expr1);
 			expr0.NewSeqBranch(unaryLogicalOper, expr1)
-				.SetBuilder(s => OperatorExpr<Operator.Logical>.Unary(s.At(unaryLogicalOper), s.At(expr1)));
+				.SetBuilder(m => OperatorExpr<Operator.Logical>.Unary(m.At(unaryLogicalOper), m.At(expr1)));
 
-			expr1.NewSeqBranch(expr2);
+			expr1.AddBranch(expr2);
 			expr1.NewSeqBranch(unaryCompOper, expr2)
-				.SetBuilder(s => OperatorExpr<Operator.Comp>.Unary(s.At(unaryCompOper), s.At(expr2)));
+				.SetBuilder(m => OperatorExpr<Operator.Comp>.Unary(m.At(unaryCompOper), m.At(expr2)));
 			expr1.NewSeqBranch(expr2, binaryCompOper, expr1)
-				.SetBuilder(s => OperatorExpr<Operator.Comp>.Binary(
-					left: s.At(expr2),
-					oper: s.At(binaryCompOper),
-					right: s.At(expr1)
-				));
+				.SetBuilder(m => OperatorExpr<Operator.Comp>.Binary(m.At(expr2), m.At(binaryCompOper), m.At(expr1)));
 
-			expr2.NewSeqBranch(expr3);
+			expr2.AddBranch(expr3);
 			expr2.NewSeqBranch(expr3, binaryArithOper, expr2)
-				.SetBuilder(s => s.At(expr2) is OperatorExpr<Operator.Arith> other && !other.IsUnary
-				? OperatorExpr<Operator.Arith>.JoinRest(s.At(expr3), s.At(binaryArithOper), other)
-				: OperatorExpr<Operator.Arith>.Binary(s.At(expr3), s.At(binaryArithOper), s.At(expr2)));
+				.SetBuilder(m => m.At(expr2) is OperatorExpr<Operator.Arith> other && !other.IsUnary
+				? OperatorExpr<Operator.Arith>.JoinRest(m.At(expr3), m.At(binaryArithOper), other)
+				: OperatorExpr<Operator.Arith>.Binary(m.At(expr3), m.At(binaryArithOper), m.At(expr2)));
 
-			expr3.NewSeqBranch(expr4);
+			expr3.AddBranch(expr4);
 			expr3.NewSeqBranch(unaryArithOper, expr4)
-				.SetBuilder(s => OperatorExpr<Operator.Arith>.Unary(s.At(unaryArithOper), s.At(expr4)));
+				.SetBuilder(m => OperatorExpr<Operator.Arith>.Unary(m.At(unaryArithOper), m.At(expr4)));
 
-			expr4.NewSeqBranch(value).SetBuilder(s => new ValueExpr(s.At(value)));
-			expr4.NewSeqBranch(attr).SetBuilder(s => new AttrExpr(s.At(attr)));
-			expr4.NewSeqBranch(lParen, expr, rParen).SetBuilder(s => new ParensExpr(s.At(expr)));
-			expr4.NewSeqBranch(lParen, selectStmt, rParen).SetBuilder(s => new SubqueryExpr(s.At(selectStmt)));
+			expr4.NewSeqBranch(value).SetBuilder(m => new ValueExpr(m.At(value)));
+			expr4.NewSeqBranch(attr).SetBuilder(m => new AttrExpr(m.At(attr)));
+			expr4.NewSeqBranch(lParen, expr, rParen).SetBuilder(m => new ParensExpr(m.At(expr)));
+			expr4.NewSeqBranch(lParen, selectStmt, rParen).SetBuilder(m => new SubqueryExpr(m.At(selectStmt)));
 
 			// Operators
 
-			binaryCompOper.NewSeqBranch(eq).SetBuilder(s => Operator.Comp.Eq);
-			binaryCompOper.NewSeqBranch(ne).SetBuilder(s => Operator.Comp.Ne);
-			binaryCompOper.NewSeqBranch(lt).SetBuilder(s => Operator.Comp.Lt);
-			binaryCompOper.NewSeqBranch(le).SetBuilder(s => Operator.Comp.Le);
-			binaryCompOper.NewSeqBranch(gt).SetBuilder(s => Operator.Comp.Gt);
-			binaryCompOper.NewSeqBranch(ge).SetBuilder(s => Operator.Comp.Ge);
-			binaryCompOper.NewSeqBranch(@in).SetBuilder(s => Operator.Comp.In);
-			binaryCompOper.NewSeqBranch(@notIn).SetBuilder(s => Operator.Comp.NotIn);
+			binaryCompOper.NewSeqBranch(eq).SetBuilder(m => Operator.Comp.Eq);
+			binaryCompOper.NewSeqBranch(ne).SetBuilder(m => Operator.Comp.Ne);
+			binaryCompOper.NewSeqBranch(lt).SetBuilder(m => Operator.Comp.Lt);
+			binaryCompOper.NewSeqBranch(le).SetBuilder(m => Operator.Comp.Le);
+			binaryCompOper.NewSeqBranch(gt).SetBuilder(m => Operator.Comp.Gt);
+			binaryCompOper.NewSeqBranch(ge).SetBuilder(m => Operator.Comp.Ge);
+			binaryCompOper.NewSeqBranch(@in).SetBuilder(m => Operator.Comp.In);
+			binaryCompOper.NewSeqBranch(@notIn).SetBuilder(m => Operator.Comp.NotIn);
 			
-			unaryCompOper.NewSeqBranch(@exists).SetBuilder(s => Operator.Comp.Exists);
+			unaryCompOper.NewSeqBranch(@exists).SetBuilder(m => Operator.Comp.Exists);
 
-			binaryArithOper.NewSeqBranch(plus).SetBuilder(s => Operator.Arith.Add);
-			binaryArithOper.NewSeqBranch(minus).SetBuilder(s => Operator.Arith.Subtract);
-			binaryArithOper.NewSeqBranch(multiply).SetBuilder(s => Operator.Arith.Multiply);
-			binaryArithOper.NewSeqBranch(divide).SetBuilder(s => Operator.Arith.Divide);
+			binaryArithOper.NewSeqBranch(plus).SetBuilder(m => Operator.Arith.Add);
+			binaryArithOper.NewSeqBranch(minus).SetBuilder(m => Operator.Arith.Subtract);
+			binaryArithOper.NewSeqBranch(multiply).SetBuilder(m => Operator.Arith.Multiply);
+			binaryArithOper.NewSeqBranch(divide).SetBuilder(m => Operator.Arith.Divide);
 
-			unaryArithOper.NewSeqBranch(minus).SetBuilder(s => Operator.Arith.Negative);
+			unaryArithOper.NewSeqBranch(minus).SetBuilder(m => Operator.Arith.Negative);
 
-			binaryLogicalOper.NewSeqBranch(and).SetBuilder(s => Operator.Logical.And);
-			binaryLogicalOper.NewSeqBranch(or).SetBuilder(s => Operator.Logical.Or);
+			binaryLogicalOper.NewSeqBranch(and).SetBuilder(m => Operator.Logical.And);
+			binaryLogicalOper.NewSeqBranch(or).SetBuilder(m => Operator.Logical.Or);
 
-			unaryLogicalOper.NewSeqBranch(not).SetBuilder(s => Operator.Logical.Not);
+			unaryLogicalOper.NewSeqBranch(not).SetBuilder(m => Operator.Logical.Not);
 
 			#endregion
 		}

@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace SyntaxParser.Demo.Parsers.Sql
 {
-	public class SelectSqlNode
+	public class SelectStmt
 	{
 		public IEnumerable<Expr?>? Columns { get; set; }
 		public IEnumerable<Relation?>? Tables { get; set; }
@@ -134,10 +134,10 @@ namespace SyntaxParser.Demo.Parsers.Sql
 
 	public class SubqueryExpr : Expr
 	{
-		public SelectSqlNode? Subquery { get; set; }
-		public SubqueryExpr(SelectSqlNode? subquery) => Subquery = subquery;
+		public SelectStmt? Subquery { get; set; }
+		public SubqueryExpr(SelectStmt? subquery) => Subquery = subquery;
 
-		public override string? ToString() => ToString($"{GetType().Name} {Subquery?.ToString(SelectSqlNode.ToStringType.Short)}");
+		public override string? ToString() => ToString($"{GetType().Name} {Subquery?.ToString(SelectStmt.ToStringType.Short)}");
 	}
 
 	public class OperatorExpr<TOperator> : Expr where TOperator: struct, Enum

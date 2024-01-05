@@ -193,11 +193,11 @@ namespace SyntaxParser
 
 	public interface ISeqNode : INode
 	{
-		public class Results
+		public class ResultMap
 		{
 			readonly ISeqNode seqNode;
 			readonly object?[] objects;
-			public Results(ISeqNode seqNode, object?[] objects)
+			public ResultMap(ISeqNode seqNode, object?[] objects)
 			{
 				this.seqNode = seqNode;
 				this.objects = objects;
@@ -268,7 +268,7 @@ namespace SyntaxParser
 
 	public class SeqNode<T> : ISeqNode, INode<T>
 	{
-		public delegate T BuilderFunc(ISeqNode.Results a);
+		public delegate T BuilderFunc(ISeqNode.ResultMap m);
 
 		public Name Name { get; }
 		public List<INode> Children { get; set; } = new();
@@ -310,9 +310,9 @@ namespace SyntaxParser
 		{
 			foreach (var childrenResults in ParseRecursive(stream, 0))
 			{
-				if (Builder is null && Children.Count != 1) throw new InvalidOperationException();
+				if (Builder is null) throw new InvalidOperationException();
 
-				var results = Builder is null ? childrenResults.First().As<T>() : Builder.Invoke(new ISeqNode.Results(this, childrenResults.ToArray()));
+				var results = Builder.Invoke(new ISeqNode.ResultMap(this, childrenResults.ToArray()));
 				Parser.LogDebug(stream, $"`{this}.Parse` yields `{results}`");
 				yield return results;
 			}
@@ -356,6 +356,7 @@ namespace SyntaxParser
 
 		public MultiNode<T> SetName(string? name) { Name.Value = name; return this; }
 		public MultiNode<T> AddBranches(params INode<T>[] branches) { Branches.AddRange(branches); return this; }
+		public MultiNode<T> AddBranch(INode<T> branch) => AddBranches(branch.Array());
 
 		public override IEnumerable<object?> Parse(InputStream stream)
 		{
