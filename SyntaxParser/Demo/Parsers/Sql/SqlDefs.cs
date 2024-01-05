@@ -9,16 +9,17 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public IEnumerable<Relation?>? Tables { get; set; }
 		public Expr? Condition { get; set; }
 
-		public enum ToStringType { Json, Sql }
+		public enum ToStringType { Full, Short, Sql }
 		public string? ToString(ToStringType type) => type switch
 		{
-			ToStringType.Json => $"{GetType().Name} {{\n\tcolumns: [\n\t\t{string.Join(",\n\t\t", Columns ?? Enumerable.Empty<Expr?>())}\n\t],\n\ttables: [\n\t\t{string.Join(",\n\t\t", Tables ?? Enumerable.Empty<Relation?>())}\n\t],\n\tcondition: {Condition?.ToString() ?? "null"}\n}}",
+			ToStringType.Full => $"{GetType().Name} {{\n\tcolumns: [\n\t\t{string.Join(",\n\t\t", Columns ?? Enumerable.Empty<Expr?>())}\n\t],\n\ttables: [\n\t\t{string.Join(",\n\t\t", Tables ?? Enumerable.Empty<Relation?>())}\n\t],\n\tcondition: {Condition?.ToString() ?? "null"}\n}}",
+			ToStringType.Short => $"{{ columns: [ {string.Join(", ", Columns ?? Enumerable.Empty<Expr?>())} ], tables: [ {string.Join(", ", Tables ?? Enumerable.Empty<Relation?>())} ], condition: {Condition?.ToString() ?? "null"} }}",
 			ToStringType.Sql => $"SELECT {string.Join(", ", Columns ?? Enumerable.Empty<Expr?>())}" +
 				($" FROM {string.Join(", ", Tables ?? Enumerable.Empty<Relation?>())}").If(Tables?.Any()) +
 				($" WHERE {Condition}").If(Condition is not null),
 			_ => throw new NotSupportedException(),
 		};
-		public override string? ToString() => ToString(ToStringType.Json);
+		public override string? ToString() => ToString(ToStringType.Full);
 	}
 
 	public class Relation
@@ -52,7 +53,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 
 	public static class Operator
 	{
-		public enum Comp { Undefined = 0 << 4, Eq, Ne, Lt, Le, Gt, Ge, In, NotIn, Exists, NotExists }
+		public enum Comp { Undefined = 0 << 4, Eq, Ne, Lt, Le, Gt, Ge, In, NotIn, Exists }
 		public enum Arith { Undefined = 1 << 4, Add, Subtract, Multiply, Divide, Negative }
 		public enum Logical { Undefined = 2 << 4, And, Or, Not }
 
@@ -68,7 +69,6 @@ namespace SyntaxParser.Demo.Parsers.Sql
 				Comp.In => " IN ",
 				Comp.NotIn => " NOT IN ",
 				Comp.Exists => "EXISTS ",
-				Comp.NotExists => "NOT EXISTS ",
 				Arith.Add => " + ",
 				Arith.Subtract => " - ",
 				Arith.Multiply => " * ",
@@ -137,7 +137,7 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public SelectSqlNode? Subquery { get; set; }
 		public SubqueryExpr(SelectSqlNode? subquery) => Subquery = subquery;
 
-		public override string? ToString() => ToString($"{Subquery?.ToString(SelectSqlNode.ToStringType.Sql)}");
+		public override string? ToString() => ToString($"{GetType().Name} {Subquery?.ToString(SelectSqlNode.ToStringType.Short)}");
 	}
 
 	public class OperatorExpr<TOperator> : Expr where TOperator: struct, Enum

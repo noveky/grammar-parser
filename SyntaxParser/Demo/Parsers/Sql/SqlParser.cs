@@ -43,7 +43,6 @@
 		public TokenNode<string> @in = new();
 		public TokenNode<string> notIn = new();
 		public TokenNode<string> exists = new();
-		public TokenNode<string> notExists = new();
 		public TokenNode<string> plus = new();
 		public TokenNode<string> minus = new();
 		public TokenNode<string> multiply = new();
@@ -104,7 +103,6 @@
 			gt.SetRegex(@">");
 			ge.SetRegex(@">=");
 			exists.SetRegex(@"\bEXISTS\b");
-			notExists.SetRegex(@"\bNOT EXISTS\b");
 			@in.SetRegex(@"\bIN\b");
 			notIn.SetRegex(@"\bNOT IN\b");
 			plus.SetRegex(@"\+");
@@ -228,7 +226,6 @@
 			binaryCompOper.NewSeqBranch(@notIn).SetBuilder(s => Operator.Comp.NotIn);
 			
 			unaryCompOper.NewSeqBranch(@exists).SetBuilder(s => Operator.Comp.Exists);
-			unaryCompOper.NewSeqBranch(@notExists).SetBuilder(s => Operator.Comp.NotExists);
 
 			binaryArithOper.NewSeqBranch(plus).SetBuilder(s => Operator.Arith.Add);
 			binaryArithOper.NewSeqBranch(minus).SetBuilder(s => Operator.Arith.Subtract);
