@@ -5,8 +5,9 @@
 		readonly Parser parser = new();
 
 		public SqlParser() => parser
-			.SetIgnoreCase() // Ignore case
+			.SetIgnoreCase(true) // Ignore case
 			.SetSkipPattern(@"\s+") // Ignore whitespace
+			.SetTokenizationType(TokenizationType.Static) // Static tokenization
 			.SetSyntaxDef(new SqlSyntaxDef());
 
 		public IEnumerable<object?> Parse(string str) => parser.Parse(str);
@@ -22,7 +23,6 @@
 		public TokenNode<bool> @true = new();
 		public TokenNode<bool> @false = new();
 		public TokenNode<object?> @null = new();
-		public TokenNode<string> id = new();
 		public TokenNode<string> @select = new();
 		public TokenNode<string> @from = new();
 		public TokenNode<string> @where = new();
@@ -30,6 +30,10 @@
 		public TokenNode<string> and = new();
 		public TokenNode<string> or = new();
 		public TokenNode<string> not = new();
+		public TokenNode<string> @in = new();
+		public TokenNode<string> notIn = new();
+		public TokenNode<string> exists = new();
+		public TokenNode<string> id = new();
 		public TokenNode<string> lParen = new();
 		public TokenNode<string> rParen = new();
 		public TokenNode<string> comma = new();
@@ -37,13 +41,10 @@
 		public TokenNode<string> star = new();
 		public TokenNode<string> eq = new();
 		public TokenNode<string> ne = new();
-		public TokenNode<string> lt = new();
 		public TokenNode<string> le = new();
-		public TokenNode<string> gt = new();
+		public TokenNode<string> lt = new();
 		public TokenNode<string> ge = new();
-		public TokenNode<string> @in = new();
-		public TokenNode<string> notIn = new();
-		public TokenNode<string> exists = new();
+		public TokenNode<string> gt = new();
 		public TokenNode<string> plus = new();
 		public TokenNode<string> minus = new();
 		public TokenNode<string> multiply = new();
@@ -85,7 +86,6 @@
 			@true.SetRegex(@"\bTRUE\b").SetBuilder(t => true);
 			@false.SetRegex(@"\bFALSE\b").SetBuilder(t => false);
 			@null.SetRegex(@"\bNULL\b").SetBuilder(t => null);
-			id.SetRegex(@"\b[A-Za-z_]+[A-Za-z0-9_]*\b").SetBuilder(t => t.Value).SetCoverTypes(@true, @false, @null);
 			@select.SetRegex(@"\bSELECT\b");
 			@from.SetRegex(@"\bFROM\b");
 			@where.SetRegex(@"\bWHERE\b");
@@ -93,6 +93,10 @@
 			and.SetRegex(@"\bAND\b");
 			or.SetRegex(@"\bOR\b");
 			not.SetRegex(@"\bNOT\b");
+			exists.SetRegex(@"\bEXISTS\b");
+			@in.SetRegex(@"\bIN\b");
+			notIn.SetRegex(@"\bNOT IN\b");
+			id.SetRegex(@"\b[A-Za-z_]+[A-Za-z0-9_]*\b").SetBuilder(t => t.Value).SetCoverTypes(@true, @false, @null);
 			lParen.SetRegex(@"\(");
 			rParen.SetRegex(@"\)");
 			comma.SetRegex(@",");
@@ -100,16 +104,13 @@
 			star.SetRegex(@"\*");
 			eq.SetRegex(@"=");
 			ne.SetRegex(@"<>");
-			lt.SetRegex(@"<");
 			le.SetRegex(@"<=");
-			gt.SetRegex(@">");
+			lt.SetRegex(@"<");
 			ge.SetRegex(@">=");
-			exists.SetRegex(@"\bEXISTS\b");
-			@in.SetRegex(@"\bIN\b");
-			notIn.SetRegex(@"\bNOT IN\b");
+			gt.SetRegex(@">");
 			plus.SetRegex(@"\+");
 			minus.SetRegex(@"-");
-			multiply.SetRegex(@"\*");
+			multiply.SetTokenType(star.TokenType);
 			divide.SetRegex(@"/");
 
 			#endregion
