@@ -18,8 +18,9 @@ public class SqlParser
 	readonly Parser parser = new();
 
 	public SqlParser() => parser
-		.SetIgnoreCase() // Ignore case
+		.SetIgnoreCase(true) // Ignore case
 		.SetSkipPattern(@"\s+") // Ignore whitespace
+		.SetTokenizationType(TokenizationType.Static) // Static tokenization
 		.SetSyntaxDef(new SqlSyntaxDef());
 
 	public IEnumerable<object?> Parse(string str) => parser.Parse(str);
