@@ -5,8 +5,8 @@
 		readonly Parser parser = new();
 
 		public SqlParser() => parser
-			.SetIgnoreCase()
-			.SetSkipPattern(@"\s+")
+			.SetIgnoreCase() // Ignore case
+			.SetSkipPattern(@"\s+") // Ignore whitespace
 			.SetSyntaxDef(new SqlSyntaxDef());
 
 		public IEnumerable<object?> Parse(string str) => parser.Parse(str);
@@ -16,15 +16,16 @@
 	{
 		public INode RootNode => root;
 
+		// Tokens
 		public TokenNode<decimal> udecimal = new();
 		public TokenNode<uint> @uint = new();
 		public TokenNode<bool> @true = new();
 		public TokenNode<bool> @false = new();
 		public TokenNode<object?> @null = new();
 		public TokenNode<string> id = new();
-		public TokenNode<string> select = new();
-		public TokenNode<string> from = new();
-		public TokenNode<string> where = new();
+		public TokenNode<string> @select = new();
+		public TokenNode<string> @from = new();
+		public TokenNode<string> @where = new();
 		public TokenNode<string> @as = new();
 		public TokenNode<string> and = new();
 		public TokenNode<string> or = new();
@@ -48,6 +49,7 @@
 		public TokenNode<string> multiply = new();
 		public TokenNode<string> divide = new();
 
+		// Syntax tree
 		public EmptyNode empty = new();
 		public MultiNode<Value> value = new();
 		public MultiNode<string?> asAlias = new();
@@ -84,9 +86,9 @@
 			@false.SetRegex(@"\bFALSE\b").SetBuilder(t => false);
 			@null.SetRegex(@"\bNULL\b").SetBuilder(t => null);
 			id.SetRegex(@"\b[A-Za-z_]+[A-Za-z0-9_]*\b").SetBuilder(t => t.Value).SetCoverTypes(@true, @false, @null);
-			select.SetRegex(@"\bSELECT\b");
-			from.SetRegex(@"\bFROM\b");
-			where.SetRegex(@"\bWHERE\b");
+			@select.SetRegex(@"\bSELECT\b");
+			@from.SetRegex(@"\bFROM\b");
+			@where.SetRegex(@"\bWHERE\b");
 			@as.SetRegex(@"\bAS\b");
 			and.SetRegex(@"\bAND\b");
 			or.SetRegex(@"\bOR\b");
@@ -120,7 +122,7 @@
 
 			// Statements
 
-			selectStmt.NewSeqBranch(select, selectColumns, fromClause, whereClause)
+			selectStmt.NewSeqBranch(@select, selectColumns, fromClause, whereClause)
 				.SetBuilder(s => new SelectSqlNode()
 				{
 					Columns = s.At(selectColumns),
@@ -131,10 +133,10 @@
 			// Components
 
 			fromClause.NewSeqBranch(empty);
-			fromClause.NewSeqBranch(from, relations).SetBuilder(s => s.At(relations));
+			fromClause.NewSeqBranch(@from, relations).SetBuilder(s => s.At(relations));
 
 			whereClause.NewSeqBranch(empty);
-			whereClause.NewSeqBranch(where, expr).SetBuilder(s => s.At(expr));
+			whereClause.NewSeqBranch(@where, expr).SetBuilder(s => s.At(expr));
 
 			selectColumns.NewSeqBranch(Syntax.Sugar.List(selectColumn, comma));
 
