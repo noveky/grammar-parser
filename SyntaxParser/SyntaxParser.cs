@@ -279,7 +279,7 @@ namespace SyntaxParser
 		public SeqNode<T> SetChildren(params INode[] children) { Children = children.ToList(); return this; }
 		public SeqNode<T> SetBuilder(BuilderFunc builder) { Builder = builder; return this; }
 
-		IEnumerable <IEnumerable<object?>> ParseRecursive(InputStream stream, int childIndex)
+		IEnumerable<IEnumerable<object?>> ParseRecursive(InputStream stream, int childIndex)
 		{
 			if (childIndex >= Children.Count) yield break;
 
@@ -288,19 +288,20 @@ namespace SyntaxParser
 			foreach (var chResult in ch.Parse(stream))
 			{
 				int checkpoint = stream.Index;
-				var chResultAsArray = new[] { chResult };
 				if (childIndex == Children.Count - 1)
 				{
-					Parser.LogDebug(stream, $"`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
-					yield return chResultAsArray;
+					var results = chResult.Array();
+					Parser.LogDebug(stream, $"`{this}.ParseRecursive` yields `{results}` at child {childIndex} `{Children[childIndex]}`");
+					yield return results;
 				}
 				else
 				{
 					stream.Index = checkpoint;
 					foreach (var restResults in ParseRecursive(stream, childIndex + 1))
 					{
-						Parser.LogDebug(stream, $"`{this}.ParseRecursive` yields `{chResult}` at child {childIndex} `{Children[childIndex]}`");
-						yield return chResultAsArray.Concat(restResults);
+						var results = chResult.PrependTo(restResults);
+						Parser.LogDebug(stream, $"`{this}.ParseRecursive` yields `{results}` at child {childIndex} `{Children[childIndex]}`");
+						yield return results;
 					}
 				}
 			}
@@ -309,10 +310,11 @@ namespace SyntaxParser
 		{
 			foreach (var childrenResults in ParseRecursive(stream, 0))
 			{
-				if (Builder is null) throw new InvalidOperationException();
+				if (Builder is null && Children.Count != 1) throw new InvalidOperationException();
 
-				Parser.LogDebug(stream, $"`{this}.Parse` yields `{childrenResults}`");
-				yield return Builder.Invoke(new ISeqNode.Results(this, childrenResults.ToArray()));
+				var results = Builder is null ? childrenResults.First().As<T>() : Builder.Invoke(new ISeqNode.Results(this, childrenResults.ToArray()));
+				Parser.LogDebug(stream, $"`{this}.Parse` yields `{results}`");
+				yield return results;
 			}
 		}
 
@@ -332,10 +334,10 @@ namespace SyntaxParser
 			{
 				stream.Index = checkpoint;
 				Parser.LogDebug(stream, $"`{this}.Parse` calls `{br}.Parse`");
-				foreach (var result in br.Parse(stream))
+				foreach (var brResult in br.Parse(stream))
 				{
-					Parser.LogDebug(stream, $"`{this}.Parse` yields `{result}`");
-					yield return result;
+					Parser.LogDebug(stream, $"`{this}.Parse` yields `{brResult}`");
+					yield return brResult;
 				}
 			}
 		}
@@ -354,7 +356,6 @@ namespace SyntaxParser
 
 		public MultiNode<T> SetName(string? name) { Name.Value = name; return this; }
 		public MultiNode<T> AddBranches(params INode<T>[] branches) { Branches.AddRange(branches); return this; }
-		public MultiNode<T> AddBranch(INode<T> branch) => AddBranches(branch.Array());
 
 		public override IEnumerable<object?> Parse(InputStream stream)
 		{
@@ -368,22 +369,20 @@ namespace SyntaxParser
 
 	public class ConvertNode<T> : MultiNode, INode<T>
 	{
-		public delegate T ConverterFunc(object? o);
+		public delegate T BuilderFunc(object? o);
 
-		public ConverterFunc? Converter { get; set; } = null;
+		public BuilderFunc? Builder { get; set; } = null;
 
 		public ConvertNode<T> SetName(string? name) { Name.Value = name; return this; }
 		public ConvertNode<T> AddBranches(params INode[] branches) { Branches.AddRange(branches); return this; }
 		public ConvertNode<T> AddBranch(INode<T> branch) => AddBranches(branch.Array());
-		public ConvertNode<T> SetConverter(ConverterFunc converter) { Converter = converter; return this; }
+		public ConvertNode<T> SetBuilder(BuilderFunc builder) { Builder = builder; return this; }
 
 		public override IEnumerable<object?> Parse(InputStream stream)
 		{
 			foreach (var baseResult in base.Parse(stream))
 			{
-				if (Converter is null) throw new InvalidOperationException();
-
-				var result = Converter.Invoke(baseResult).As<T>();
+				var result = (Builder is null ? baseResult : Builder.Invoke(baseResult)).As<T>();
 				Parser.LogDebug(stream, $"`{this}.Parse` yields `{result}`");
 				yield return result;
 			}

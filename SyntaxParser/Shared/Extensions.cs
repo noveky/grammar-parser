@@ -1,9 +1,12 @@
 ﻿using System.Dynamic;
+using System.Runtime.CompilerServices;
 
 namespace SyntaxParser.Shared
 {
-	public static class ObjectExtentions
+	public static class Extensions
 	{
+		public static object? If(this object? value, bool? cond) => cond is true ? value : null;
+		public static object? Then(this bool cond, object? value) => cond is true ? value : null;
 		public static bool IsIn(this object? obj, params object?[]? collection) => collection?.Contains(obj) is true;
 #pragma warning disable CS8600, CS8603
 		public static T As<T>(this object? obj) => (T)obj;
