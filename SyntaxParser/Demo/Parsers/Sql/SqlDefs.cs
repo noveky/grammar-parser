@@ -11,11 +11,11 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public enum ToStringType { Full, Short, Sql }
 		public string? ToString(ToStringType type) => type switch
 		{
-			ToStringType.Full => $"{GetType().Name} {{\n\tcolumns: [\n\t\t{string.Join(",\n\t\t", Columns ?? Enumerable.Empty<Expr?>())}\n\t],\n\ttables: [\n\t\t{string.Join(",\n\t\t", Tables ?? Enumerable.Empty<Relation?>())}\n\t],\n\tcondition: {Condition?.ToString() ?? "null"}\n}}",
-			ToStringType.Short => $"{{ columns: [ {string.Join(", ", Columns ?? Enumerable.Empty<Expr?>())} ], tables: [ {string.Join(", ", Tables ?? Enumerable.Empty<Relation?>())} ], condition: {Condition?.ToString() ?? "null"} }}",
-			ToStringType.Sql => $"SELECT {string.Join(", ", Columns ?? Enumerable.Empty<Expr?>())}" +
-				($" FROM {string.Join(", ", Tables ?? Enumerable.Empty<Relation?>())}").If(Tables?.Any()) +
-				($" WHERE {Condition}").If(Condition is not null),
+			ToStringType.Full => $"{GetType().Name} {{\n\tcolumns: [\n\t\t{string.Join(",\n\t\t", Columns ?? [])}\n\t],\n\ttables: [\n\t\t{string.Join(",\n\t\t", Tables ?? [])}\n\t],\n\tcondition: {Condition?.ToString() ?? "null"}\n}}",
+			ToStringType.Short => $"{{ columns: [ {string.Join(", ", Columns ?? [])} ], tables: [ {string.Join(", ", Tables ?? [])} ], condition: {Condition?.ToString() ?? "null"} }}",
+			ToStringType.Sql => $"SELECT {string.Join(", ", Columns ?? [])}" +
+				$" FROM {string.Join(", ", Tables ?? [])}".If(Tables?.Any()) +
+				$" WHERE {Condition}".If(Condition is not null),
 			_ => throw new NotSupportedException(),
 		};
 		public override string? ToString() => ToString(ToStringType.Full);
@@ -38,10 +38,9 @@ namespace SyntaxParser.Demo.Parsers.Sql
 			$"{(RelationName is null ? null : $"{RelationName}.")}{FieldName}";
 	}
 
-	public class Value
+	public class Value(object? value)
 	{
-		public object? ValueObj { get; set; }
-		public Value(object? value) => ValueObj = value;
+		public object? ValueObj { get; set; } = value;
 
 		public Type? Type => ValueObj?.GetType();
 		public bool IsNumeric => Type.IsIn(null, typeof(byte), typeof(sbyte), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long), typeof(ulong), typeof(float), typeof(double), typeof(decimal));
@@ -107,57 +106,48 @@ namespace SyntaxParser.Demo.Parsers.Sql
 		public override string? ToString() => $"{Alias}";
 	}
 
-	public class ValueExpr : Expr
+	public class ValueExpr(Value? value) : Expr
 	{
-		public Value? Value { get; set; }
-		public ValueExpr(Value? value) => Value = value;
+		public Value? Value { get; set; } = value;
 
 		public override string? ToString() => ToString($"{Value}");
 	}
 
-	public class AttrExpr : Expr
+	public class AttrExpr(Attr? attr) : Expr
 	{
-		public Attr? Attr { get; set; }
-		public AttrExpr(Attr? attr) => Attr = attr;
+		public Attr? Attr { get; set; } = attr;
 
 		public override string? ToString() => ToString($"{Attr}");
 	}
 
-	public class ParensExpr : Expr
+	public class ParensExpr(Expr? child) : Expr
 	{
-		public Expr? Child { get; set; }
-		public ParensExpr(Expr? child) => Child = child;
+		public Expr? Child { get; set; } = child;
 
 		public override string? ToString() => ToString($"{Child}");
 	}
 
-	public class SubqueryExpr : Expr
+	public class SubqueryExpr(SelectStmt? subquery) : Expr
 	{
-		public SelectStmt? Subquery { get; set; }
-		public SubqueryExpr(SelectStmt? subquery) => Subquery = subquery;
+		public SelectStmt? Subquery { get; set; } = subquery;
 
 		public override string? ToString() => ToString($"{GetType().Name} {Subquery?.ToString(SelectStmt.ToStringType.Short)}");
 	}
 
-	public class OperatorExpr<TOperator> : Expr where TOperator : struct, Enum
+	public class OperatorExpr<TOperator>(IEnumerable<OperatorExpr<TOperator>.Unit?>? children) : Expr where TOperator : struct, Enum
 	{
-		public class Unit
+		public class Unit(TOperator? oper, Expr? expr)
 		{
-			public TOperator? Oper { get; set; }
-			public Expr? Expr { get; set; }
-			public Unit(TOperator? oper, Expr? expr)
-			{
-				Oper = oper;
-				Expr = expr;
-			}
+			public TOperator? Oper { get; set; } = oper;
+			public Expr? Expr { get; set; } = expr;
 		}
 
-		public IEnumerable<Unit?>? Children { get; set; }
-		public OperatorExpr(IEnumerable<Unit?>? children) => Children = children;
+		public IEnumerable<Unit?>? Children { get; set; } = children;
+
 		public static OperatorExpr<TOperator> Binary(Expr? left, TOperator? oper, Expr? right)
-			=> new(new Unit[] { new(null, left), new(oper, right) });
+			=> new([new(null, left), new(oper, right)]);
 		public static OperatorExpr<TOperator> Unary(TOperator? oper, Expr? right)
-			=> new(new Unit(oper, right).Array());
+			=> new([new Unit(oper, right)]);
 		public static OperatorExpr<TOperator> JoinRest(Expr? expr, TOperator? oper, OperatorExpr<TOperator>? other)
 		{
 			var unit = new Unit(null, expr);

@@ -11,18 +11,18 @@ namespace SyntaxParser.Shared
 		public static T As<T>(this object? obj) => (T)obj;
 #pragma warning restore CS8600, CS8603
 		public static IEnumerable<T>? AsEnumerable<T>(this object? obj) => obj.As<IEnumerable<T>?>();
-		public static T[] Array<T>(this T obj) => new[] { obj };
-		public static T[] Array<T>(this object? obj) => new[] { obj.As<T>() };
+		public static T[] Array<T>(this T obj) => [obj];
+		public static T[] Array<T>(this object? obj) => [obj.As<T>()];
 		public static IEnumerable<T> ConcatBefore<T>(this IEnumerable<T>? obj, IEnumerable<T>? other) =>
-			(obj ?? Enumerable.Empty<T>()).Concat(other ?? Enumerable.Empty<T>());
+			(obj ?? []).Concat(other ?? []);
 		public static IEnumerable<T> ConcatBefore<T>(this object? obj, object? other) =>
 			ConcatBefore(obj.AsEnumerable<T>(), other.AsEnumerable<T>());
 		public static IEnumerable<T> AppendTo<T>(this T obj, IEnumerable<T>? other) =>
-			(other ?? Enumerable.Empty<T>()).Append(obj);
+			(other ?? []).Append(obj);
 		public static IEnumerable<T> AppendTo<T>(this object? obj, object? other) =>
 			AppendTo(obj.As<T>(), other.AsEnumerable<T>());
 		public static IEnumerable<T> PrependTo<T>(this T obj, IEnumerable<T>? other) =>
-			(other ?? Enumerable.Empty<T>()).Prepend(obj);
+			(other ?? []).Prepend(obj);
 		public static IEnumerable<T> PrependTo<T>(this object? obj, object? other) =>
 			PrependTo(obj.As<T>(), other.AsEnumerable<T>());
 		public static ExpandoObject ToExpando(this object obj)

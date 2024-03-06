@@ -35,7 +35,7 @@ namespace SyntaxParser
 				RootNode = value.RootNode;
 			}
 		}
-		public List<TokenType> TokenTypes { get; } = new();
+		public List<TokenType> TokenTypes { get; } = [];
 		public INode? RootNode { get; private set; }
 		public bool IgnoreCase { get; set; } = false;
 		public string? SkipPattern { get; set; }
@@ -118,18 +118,11 @@ namespace SyntaxParser
 		public Token? NextToken(TokenType? type);
 	}
 
-	public class InputStream : IStream
+	public class InputStream(Parser parser, string str) : IStream
 	{
-		readonly Parser parser;
-		readonly string str;
 		public object this[int index] => str[index];
 		public object[] this[Range range] => str[range].Cast<object>().ToArray();
 		public int Index { get; set; } = 0;
-		public InputStream(Parser parser, string str)
-		{
-			this.parser = parser;
-			this.str = str;
-		}
 
 		public bool AtBegin => Index <= 0 &&
 			(Index == 0 ? true : throw new IndexOutOfRangeException());
@@ -167,16 +160,12 @@ namespace SyntaxParser
 		}
 	}
 
-	public class TokenStream : IStream
+	public class TokenStream(IEnumerable<Token> tokens) : IStream
 	{
-		readonly Token[] tokens;
+		readonly Token[] tokens = tokens.ToArray();
 		public object this[int index] => tokens[index];
 		public object[] this[Range range] => tokens[range];
 		public int Index { get; set; } = 0;
-		public TokenStream(IEnumerable<Token> tokens)
-		{
-			this.tokens = tokens.ToArray();
-		}
 
 		public bool AtBegin => Index <= 0 &&
 			(Index == 0 ? true : throw new IndexOutOfRangeException());
@@ -184,7 +173,7 @@ namespace SyntaxParser
 			(Index == tokens.Length ? true : throw new IndexOutOfRangeException());
 		public Token? Cur => AtEnd ? null : tokens[Index];
 		public object? Current => Cur;
-		public Token[] Rest => AtEnd ? Array.Empty<Token>() : tokens[Index..];
+		public Token[] Rest => AtEnd ? [] : tokens[Index..];
 
 		public Token? NextToken(TokenType? type)
 		{
@@ -202,15 +191,10 @@ namespace SyntaxParser
 		}
 	}
 
-	public class Name
+	public class Name(Type type, string? value = null)
 	{
-		readonly Type? type;
-		public string? Value { get; set; }
-		public Name(Type type, string? value = null)
-		{
-			this.type = type;
-			Value = value;
-		}
+		readonly Type? type = type;
+		public string? Value { get; set; } = value;
 
 		public override string? ToString() => Value ?? type?.Name;
 	}
@@ -222,7 +206,7 @@ namespace SyntaxParser
 
 	public class TokenType : INameable
 	{
-		public List<TokenType> CoverTypes { get; set; } = new();
+		public List<TokenType> CoverTypes { get; set; } = [];
 		public Name Name { get; }
 		public string? Regex { get; set; }
 		public TokenType() => Name = new(GetType());
@@ -230,15 +214,10 @@ namespace SyntaxParser
 		public override string? ToString() => $"{Name}(\"{Regex}\")";
 	}
 
-	public class Token
+	public class Token(TokenType type, string value)
 	{
-		public TokenType Type { get; set; }
-		public string Value { get; set; }
-		public Token(TokenType type, string value)
-		{
-			Type = type;
-			Value = value;
-		}
+		public TokenType Type { get; set; } = type;
+		public string Value { get; set; } = value;
 
 		public override string? ToString() => $"{Type.Name}(\"{Value}\")";
 	}
@@ -262,8 +241,8 @@ namespace SyntaxParser
 				var restElements = Multiple<IEnumerable<T>?>();
 				restElements.NewSeqBranch(Empty()).SetBuilder(a => null);
 				restElements.NewSeqBranch(separator is null
-					? new INode[] { element, restElements }
-					: new INode[] { separator, element, restElements })
+					? [element, restElements]
+					: [separator, element, restElements])
 					.SetBuilder(a => a.At(element).PrependTo(a.At(restElements)));
 
 				var elements = Sequence<IEnumerable<T>>(element, restElements)
@@ -288,16 +267,8 @@ namespace SyntaxParser
 
 	public interface ISeqNode : INode
 	{
-		public class ResultMap
+		public class ResultMap(ISeqNode seqNode, object?[] objects)
 		{
-			readonly ISeqNode seqNode;
-			readonly object?[] objects;
-			public ResultMap(ISeqNode seqNode, object?[] objects)
-			{
-				this.seqNode = seqNode;
-				this.objects = objects;
-			}
-
 			public object? this[int index] => objects[index];
 			public TNode At<TNode>(INode<TNode> node, int order = 0) =>
 				objects[seqNode.Children.Select((n, i) => new { n, i }).Where(x => x.n == node).ElementAt(order).i].As<TNode>();
@@ -367,12 +338,12 @@ namespace SyntaxParser
 		public delegate T BuilderFunc(ISeqNode.ResultMap m);
 
 		public Name Name { get; }
-		public List<INode> Children { get; set; } = new();
+		public List<INode> Children { get; set; } = [];
 		public BuilderFunc? Builder { get; set; }
 		public SeqNode() => Name = new(GetType());
 
 		public SeqNode<T> SetName(string? name) { Name.Value = name; return this; }
-		public SeqNode<T> SetChildren(params INode[] children) { Children = children.ToList(); return this; }
+		public SeqNode<T> SetChildren(params INode[] children) { Children = [.. children]; return this; }
 		public SeqNode<T> SetBuilder(BuilderFunc builder) { Builder = builder; return this; }
 
 		IEnumerable<IEnumerable<object?>> ParseRecursive(IStream stream, int childIndex)
@@ -386,7 +357,7 @@ namespace SyntaxParser
 				int checkpoint = stream.Index;
 				if (childIndex == Children.Count - 1)
 				{
-					var results = chResult.Array();
+					IEnumerable<object?> results = [chResult];
 					Parser.LogDebug(stream, $"`{this}.ParseRecursive` yields `{results}` at child {childIndex} `{Children[childIndex]}`");
 					yield return results;
 				}
@@ -420,7 +391,7 @@ namespace SyntaxParser
 	public abstract class MultiNode : IMultiNode
 	{
 		public Name Name { get; }
-		public List<INode> Branches { get; set; } = new();
+		public List<INode> Branches { get; set; } = [];
 		public MultiNode() => Name = new(GetType());
 
 		public virtual IEnumerable<object?> Parse(IStream stream)
@@ -452,7 +423,7 @@ namespace SyntaxParser
 
 		public MultiNode<T> SetName(string? name) { Name.Value = name; return this; }
 		public MultiNode<T> AddBranches(params INode<T>[] branches) { Branches.AddRange(branches); return this; }
-		public MultiNode<T> AddBranch(INode<T> branch) => AddBranches(branch.Array());
+		public MultiNode<T> AddBranch(INode<T> branch) => AddBranches([branch]);
 
 		public override IEnumerable<object?> Parse(IStream stream)
 		{
@@ -472,7 +443,7 @@ namespace SyntaxParser
 
 		public ConvertNode<T> SetName(string? name) { Name.Value = name; return this; }
 		public ConvertNode<T> AddBranches(params INode[] branches) { Branches.AddRange(branches); return this; }
-		public ConvertNode<T> AddBranch(INode<T> branch) => AddBranches(branch.Array());
+		public ConvertNode<T> AddBranch(INode<T> branch) => AddBranches([branch]);
 		public ConvertNode<T> SetBuilder(BuilderFunc builder) { Builder = builder; return this; }
 
 		public override IEnumerable<object?> Parse(IStream stream)
